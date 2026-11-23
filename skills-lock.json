@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "skills": {
+    "fastapi-templates": {
+      "source": "wshobson/agents",
+      "commit": "91ff75307f5668916f3eb77d5ba556266c961376",
+      "sourceType": "github",
+      "skillPath": "plugins/api-scaffolding/skills/fastapi-templates/SKILL.md",
+      "computedHash": "ff45d61c054d67cf62da1b1ce0107ac8185cf5061e80bbf38ac6156f4a5d0542",
+      "installMode": "copy"
+    },
+    "github-actions-hardening": {
+      "source": "github/awesome-copilot",
+      "commit": "f10fdb8b2660ce85c98f220b2f1ca24653768a5c",
+      "sourceType": "github",
+      "skillPath": "skills/github-actions-hardening/SKILL.md",
+      "computedHash": "ce7df8e90622480a41ffae4a81c78dbf4de3a6965cc21a91693efdf15fb3284c",
+      "installMode": "copy"
+    },
+    "jira-integration": {
+      "source": "affaan-m/ECC",
+      "commit": "4adeee6732a12d1540f49a4d50a38ce8c97f9a53",
+      "sourceType": "github",
+      "skillPath": "skills/jira-integration/SKILL.md",
+      "computedHash": "466d00f48b65c78313cf19f1793aed07b1b6cbb5fb34ccf07aff959f839ab03e",
+      "installMode": "copy"
+    },
+    "multi-stage-dockerfile": {
+      "source": "github/awesome-copilot",
+      "commit": "f10fdb8b2660ce85c98f220b2f1ca24653768a5c",
+      "sourceType": "github",
+      "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
+      "computedHash": "c74ad7dbfdc563e9a95308b7ff812882fa79872a097a2950c4f8346c815bdab6",
+      "installMode": "copy"
+    },
+    "postgresql-optimization": {
+      "source": "github/awesome-copilot",
+      "commit": "f10fdb8b2660ce85c98f220b2f1ca24653768a5c",
+      "sourceType": "github",
+      "skillPath": "skills/postgresql-optimization/SKILL.md",
+      "computedHash": "b28b67b9111cffa917cf4bffce56a1f37003ae08a1de79c302f297d38de2555d",
+      "installMode": "copy"
+    },
+    "postgresql-table-design": {
+      "source": "wshobson/agents",
+      "commit": "91ff75307f5668916f3eb77d5ba556266c961376",
+      "sourceType": "github",
+      "skillPath": "plugins/database-design/skills/postgresql-table-design/SKILL.md",
+      "computedHash": "c2d9f4b5037b4320be0cc2489eeb287d3147477ae1f48b33f5f897e2c562ed06",
+      "installMode": "copy"
+    },
+    "to-tickets": {
+      "source": "mattpocock/skills",
+      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "17496514c92954f68eacdf2b1221e2ddb39fa231b83f03c70bc7d4422f704b2d",
+      "installMode": "copy"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "commit": "91ff75307f5668916f3eb77d5ba556266c961376",
+      "sourceType": "github",
+      "skillPath": "plugins/javascript-typescript/skills/typescript-advanced-types/SKILL.md",
+      "computedHash": "34c5b3863fde1fc85981ac583ecaf0140471b374d0b7002ac5bc0bea2cf38b24",
+      "installMode": "copy"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "6ec2bb58334ca3014573c4cbd4834ee3a40afd9d",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "ecbf45740eab6a35db93506396f68969ad80e2615f24e3c767a4decc9430751c",
+      "installMode": "copy"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "48cd9a742a59250edec6db89cf081ef5465f365e2133f6d6c5e29c380b754b7d",
+      "installMode": "copy"
+    }
+  }
+}

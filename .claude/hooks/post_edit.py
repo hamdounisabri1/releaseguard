@@ -1,0 +1,79 @@
+"""PostToolUse hook for Edit / Write / MultiEdit.
+
+- backend/**/*.py  -> ruff format + ruff check --fix (via uv), once backend/pyproject.toml exists.
+- frontend/**/*.{ts,tsx,js,jsx} -> eslint --fix, once frontend/node_modules is installed.
+
+Does nothing when the tooling isn't set up yet (pre-code safe).
+Exit code 2 shows remaining lint errors to Claude so it can fix them.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+TIMEOUT = 60
+
+
+def run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def report(result: subprocess.CompletedProcess[str] | None, label: str) -> None:
+    if result is None or result.returncode == 0:
+        return
+    output = (result.stdout + result.stderr).strip()
+    # Tool not installed in the project yet: stay silent.
+    if any(s in output.lower() for s in ("failed to spawn", "not found", "no such file", "cannot find")):
+        return
+    print(f"{label} reported problems:\n{output[-3000:]}", file=sys.stderr)
+    sys.exit(2)
+
+
+def main() -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return
+    file_path = (payload.get("tool_input") or {}).get("file_path")
+    if not file_path:
+        return
+
+    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ".").resolve()
+    path = Path(file_path)
+    if not path.is_absolute():
+        path = root / path
+    path = path.resolve()
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        return
+    if not path.exists() or not rel.parts:
+        return
+
+    backend, frontend = root / "backend", root / "frontend"
+
+    if rel.parts[0] == "backend" and path.suffix == ".py":
+        if not (backend / "pyproject.toml").exists() or not shutil.which("uv"):
+            return
+        target = str(path.relative_to(backend))
+        run(["uv", "run", "--quiet", "ruff", "format", target], backend)
+        report(run(["uv", "run", "--quiet", "ruff", "check", "--fix", target], backend), "ruff")
+
+    elif rel.parts[0] == "frontend" and path.suffix in {".ts", ".tsx", ".js", ".jsx"}:
+        bin_dir = frontend / "node_modules" / ".bin"
+        eslint = bin_dir / ("eslint.cmd" if os.name == "nt" else "eslint")
+        if not eslint.exists():
+            return
+        report(run([str(eslint), "--fix", str(path.relative_to(frontend))], frontend), "eslint")
+
+
+if __name__ == "__main__":
+    main()

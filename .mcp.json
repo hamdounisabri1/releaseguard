@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "jira": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-atlassian==0.21.0"],
+      "env": {
+        "JIRA_URL": "${JIRA_URL}",
+        "JIRA_USERNAME": "${JIRA_EMAIL}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}",
+        "JIRA_PROJECTS_FILTER": "SCRUM"
+      }
+    }
+  }
+}

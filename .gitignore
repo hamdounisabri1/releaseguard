@@ -1,0 +1,46 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Claude Code personal settings (shared settings in .claude/settings.json are committed)
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.pnpm-store/
+
+# Playwright
+test-results/
+playwright-report/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Backups
+*.sql.gz
+backups/
+
+# Note: CLAUDE.md, docs/, .claude/ (except settings.local.json) and skills-lock.json
+# must stay tracked. Never ignore the whole `.claude/` folder, and never add `!`
+# re-include rules for it: they would override the secret and cache patterns above.
+# Check with: git check-ignore -v .claude/skills/<name>/SKILL.md  (must print nothing)
