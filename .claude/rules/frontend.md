@@ -13,9 +13,9 @@ paths:
 ## Structure and data
 - Routes in `app/` (login, dashboard, applications/[appId], deployments/[deploymentId], approvals, environments, settings). Feature components in `components/<feature>/`, primitives in `components/ui/`.
 - Put all API calls in `services/`, using types **generated from the backend OpenAPI** (`openapi-typescript`) in `types/`. Don't hand-write API response types.
-- Fetch data with TanStack Query. Poll in-progress deployments (Deploying, Verifying) until they reach a terminal state.
+- Fetch data with TanStack Query. Poll active deployments (Queued, Deploying, Verifying) until they reach a terminal state.
 - Forms: React Hook Form + Zod. The backend validates again, and its 422 errors are shown next to the matching field.
-- Sessions use an `HttpOnly` cookie. Never read or store tokens in JS. Send requests `credentials: "include"`.
+- Sessions use an `HttpOnly` cookie. Never read or store tokens in JS. In production the API is same-origin (`/api/v1` behind Caddy); send requests with `credentials: "include"` so local dev on separate ports works too.
 - The only environment variable available in the browser is `NEXT_PUBLIC_API_BASE_URL`.
 
 ## UI rules
@@ -23,7 +23,8 @@ paths:
 - Hiding controls by role is a UX nicety only. The backend enforces permissions. Handle 403 and 404 gracefully.
 - Always show **environment and version** next to a deployment status.
 - Keep **deployment status** and **environment health** visually distinct. A deployment can succeed while the app is unhealthy.
-- One status vocabulary and color map, defined in one place: Succeeded = green, Unhealthy = amber, Failed = red, Awaiting approval = blue (others neutral).
+- One status vocabulary and color map, defined in one place, for the states in guide §8: Succeeded = green, Unhealthy = amber, Failed = red, Awaiting approval = blue, Queued/Deploying/Verifying = neutral with a progress indicator, Rejected/Expired/Cancelled = neutral. Environment health (Healthy/Unhealthy/Unknown) uses its own badge.
+- A 409 `environment_busy` means another deployment is active in that environment: show which one and link to it.
 - Production deploys and rollbacks need a confirmation dialog that shows **current vs. target version**. Rollback needs a reason.
 - Show approver identity and timestamp wherever an approval appears. Label AI probable causes **"AI-generated hypothesis"**.
 - Store timestamps in UTC and render them in the user's local time.

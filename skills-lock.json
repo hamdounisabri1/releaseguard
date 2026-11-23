@@ -1,6 +1,14 @@
 {
   "version": 2,
   "skills": {
+    "architecture": {
+      "source": "anthropics/knowledge-work-plugins",
+      "commit": "0e0fcacddcc892eb92a1b7873ff9d68159c47571",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/architecture/SKILL.md",
+      "computedHash": "798fb80a8686ffbde8d5461f2c870f019c8cd53434bb7409babd3bc5da952c6a",
+      "installMode": "copy"
+    },
     "fastapi-templates": {
       "source": "wshobson/agents",
       "commit": "91ff75307f5668916f3eb77d5ba556266c961376",
@@ -47,6 +55,14 @@
       "sourceType": "github",
       "skillPath": "plugins/database-design/skills/postgresql-table-design/SKILL.md",
       "computedHash": "c2d9f4b5037b4320be0cc2489eeb287d3147477ae1f48b33f5f897e2c562ed06",
+      "installMode": "copy"
+    },
+    "system-design": {
+      "source": "anthropics/knowledge-work-plugins",
+      "commit": "0e0fcacddcc892eb92a1b7873ff9d68159c47571",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/system-design/SKILL.md",
+      "computedHash": "af8f7a393dea88bf9f4a4bc2c799ece207f6988436a7eab1f805e5384948b3fd",
       "installMode": "copy"
     },
     "to-tickets": {

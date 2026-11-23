@@ -45,7 +45,7 @@ All plugins come from the official marketplace, `claude-plugins-official`.
 | **ui-ux-pro-max** | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | MIT | UI/UX guidance for every screen: styles, palettes, typography, accessibility, Next.js and shadcn/ui rules |
 | **webapp-testing** | [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/webapp-testing) | Apache-2.0 | Driving the running app with Playwright: verifying sprint demos, screenshots, E2E checks |
 | **postgresql-table-design** | [wshobson/agents](https://github.com/wshobson/agents) | MIT | Designing the Postgres schema and Alembic migrations: data types, constraints, indexes |
-| **postgresql-optimization** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Postgres-specific features and tuning: JSONB, indexes, the `FOR UPDATE SKIP LOCKED` job table, advisory locks |
+| **postgresql-optimization** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Postgres-specific features and tuning: JSONB, indexes, the `FOR UPDATE SKIP LOCKED` jobs table, the partial unique index for one active deployment per environment |
 | **fastapi-templates** | [wshobson/agents](https://github.com/wshobson/agents) | MIT | Async patterns, dependency injection and error handling. **Not** for auth (it teaches JWT; this project uses server-side sessions) or folder layout (see `backend.md`) |
 | **typescript-advanced-types** | [wshobson/agents](https://github.com/wshobson/agents) | MIT | Type-safe API clients, status unions and generics in the Next.js frontend |
 | **github-actions-hardening** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Security review of the `ci.yml` and deploy/rollback workflows: injection, token permissions, SHA pinning |
@@ -53,11 +53,16 @@ All plugins come from the official marketplace, `claude-plugins-official`.
 | **multi-stage-dockerfile** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Small, safe multi-stage Dockerfiles for the backend, worker and frontend images |
 | **to-tickets** | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-tickets) | MIT | `/to-tickets` (user-invoked only): in the one-time up-front planning pass, drafts every sprint's checklist as vertical-slice Jira Tasks with blocking links, then creates them under each sprint's Epic after approval. Its Jira configuration is in `jira-workflow.md` §3 |
 
+| **system-design** | [anthropics/knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins/tree/main/engineering/skills/system-design) | Apache-2.0 | Framework for designing components, APIs, data models and service boundaries: requirements, high-level design, deep dive, trade-offs. Complements `DEVELOPMENT_LIFECYCLE.md`; it never overrides it |
+| **architecture** | [anthropics/knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins/tree/main/engineering/skills/architecture) | Apache-2.0 | `/architecture`: weighs options and trade-offs for a technical decision. Record the outcome with `/new-adr` (project template), not with this skill's own ADR format |
+
 Built-in skills the rules also reference (shipped with Claude Code, nothing to install): **`claude-api`** for AI provider code (`ai.md`).
 
 > **Local changes to third-party skills** (reapply after `npx skills update`, which overwrites them):
 > - `ui-ux-pro-max/SKILL.md`: script paths changed from `${CLAUDE_PLUGIN_ROOT}/.claude/skills/...` to `.claude/skills/...` so it works as a project skill.
 > - `to-tickets/SKILL.md`: the "run `/setup-matt-pocock-skills`" line now points to `jira-workflow.md` §3 (Jira `SCRUM` configuration). `LICENSE` was added from upstream, because the installer copies only the skill folder.
+>
+> - `architecture/SKILL.md`: the `CONNECTORS.md` link (a file that doesn't exist in this repo) now points to `/new-adr` and the `jira` MCP server. `LICENSE` (Apache-2.0) was added to both `architecture` and `system-design` from upstream, because the installer copies only the skill folder.
 >
 > **Known issue, not patched:** `webapp-testing/scripts/with_server.py` leaves `node` running on Windows and can hang on full output pipes. Start the app yourself as a background task and run Playwright directly (see `frontend.md`).
 

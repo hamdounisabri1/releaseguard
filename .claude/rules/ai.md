@@ -11,7 +11,7 @@ paths:
 
 ## Boundary
 - AI **explains and recommends only**. It never approves, dispatches, rolls back, or picks commands, repositories, refs or targets. No tool use and no function calling that touches operations.
-- AI runs only as an **async worker job**. A deployment never waits on AI, and a provider outage never changes deployment state.
+- AI runs only as a **worker job** (`jobs.kind` = `ai_analysis` or `ai_release_notes`). `transition()` enqueues an analysis when a deployment becomes Failed or Unhealthy and AI is enabled. A deployment never waits on AI, and a provider outage never changes deployment state.
 - If `AI_API_KEY` is empty, AI is disabled and every other feature works normally.
 
 ## AIService

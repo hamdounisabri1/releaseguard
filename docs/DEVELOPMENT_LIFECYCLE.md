@@ -12,6 +12,8 @@
 
 This guide brings together everything the team needs to understand **what** ReleaseGuard is, **how** it is built, and **how we work** while building it. Sections 1–13 and 15–19 summarize and expand on the specification. Section 14 sets out the engineering process that the spec does not cover. Where this guide recommends something that is not in the spec, the text marks it as *(recommendation)*.
 
+> **Design revision, 23 Nov 2026.** The architecture was reviewed before any code was written ([ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md)) and the decisions are recorded in [ADRs 0001–0007](adr/). This guide reflects the revised design. In short: a DB-enforced single active deployment per environment, a state machine without stuck states, approvals and rollbacks stored on the deployment, one Postgres jobs table for all async work, one `deploy.yml` workflow, release registration through GitHub OIDC, and CSRF/SSRF defenses.
+
 ---
 
 ## Table of contents
@@ -76,13 +78,13 @@ The demo uses a small sample application, **TaskFlow**, that publishes Docker im
 **Happy path:**
 1. A developer pushes a change to TaskFlow.
 2. GitHub Actions runs lint, tests and security checks, then builds and publishes a Docker image.
-3. ReleaseGuard registers the release: version, commit SHA, image tag and **immutable digest**.
-4. A workflow deploys the release to staging and reports back.
-5. A developer requests production deployment. ReleaseGuard checks the policy and opens an approval request.
+3. `ci.yml` registers the release with ReleaseGuard (authenticated by a GitHub OIDC token): version, commit SHA, image tag and **immutable digest**. Development deploys automatically.
+4. ReleaseGuard dispatches `deploy.yml` to staging (automatically or on request) and tracks the run.
+5. A developer requests production deployment. ReleaseGuard checks the policy (staging succeeded) and the deployment waits in *Awaiting approval*.
 6. An authorized reviewer approves or rejects it. The decision and comment are recorded.
-7. After approval, ReleaseGuard dispatches the production workflow.
-8. The workflow deploys the approved image. ReleaseGuard tracks the run and performs HTTP health checks.
-9. If the deployment passes, the environment points to the new version. If it fails verification, the deployment is marked **Unhealthy** and a manual rollback can start.
+7. After approval, the deployment is *Queued* and the worker dispatches `deploy.yml` for production.
+8. The workflow deploys the approved image. Once it finishes, the environment points to the new version and ReleaseGuard verifies it with HTTP health checks.
+9. If verification passes, the deployment is **Succeeded**. If it fails, the deployment is marked **Unhealthy** and a manual rollback can start.
 
 ---
 
@@ -103,6 +105,10 @@ The demo uses a small sample application, **TaskFlow**, that publishes Docker im
 | **Workflow dispatch** | A GitHub API event that starts a workflow manually with defined inputs. |
 | **Webhook** | An HTTP event that GitHub sends to notify ReleaseGuard about activity. |
 | **Health check** | An HTTP request that checks whether the deployed app responds as expected. |
+| **Verification** | The health checks run right after a deploy; they decide Succeeded or Unhealthy. |
+| **Environment policy** | Per-environment rules: auto-deploy, approval, promotion source, rollback approval. |
+| **Active deployment** | A deployment in Queued, Deploying or Verifying. At most **one** per environment. |
+| **Job** | A row in the `jobs` table that the worker runs (dispatch, health check, AI, sweeps). |
 | **Rollback** | A **new** deployment that restores a previously published artifact. |
 | **RBAC** | Role-based access control: permissions are assigned by workspace role. |
 | **Audit log** | A durable record of significant user and system actions. |
@@ -176,32 +182,44 @@ Answers three questions: *What is deployed? What needs attention? What happened 
 A release records exactly what was built and what should be deployed:
 - version (SemVer or Git tag), commit SHA, branch
 - Docker image repository, tag and **digest**
-- build status, build timestamp and the actor who started it
+- source (`ci` through GitHub OIDC, or `manual`), build timestamp and the actor who started it
 - GitHub workflow run ID and URL, plus commit and PR links where available
 - release notes or a generated commit summary
 - links to every deployment of this release
 
-**The image digest is the authoritative artifact ID.** Tags are labels and can change. Deploy by digest, or enforce an immutable-tag policy.
+**The image digest is the authoritative artifact ID** ([ADR-0002](adr/0002-deploy-by-image-digest.md)). Tags are labels and can change. Every deployment is by digest.
+
+**Registration** comes from TaskFlow's `ci.yml` with a GitHub Actions **OIDC** token ([ADR-0006](adr/0006-release-registration-via-oidc.md)). The backend verifies the token and binds it to the application's repository and CI workflow. Manual registration is an Admin/Developer fallback.
 
 ### 4.4 Environment management
-| Environment | Default behavior | Purpose |
+| Environment | Default policy | Purpose |
 |---|---|---|
-| Development | Automatic | Early integration and developer feedback |
-| Staging | Automatic or manual | Validate the release in a production-like environment |
-| Production | Approval required | Protected environment used by real users |
+| Development | `auto_deploy_on_release` | Early integration and developer feedback |
+| Staging | Auto or on request; `promote_from` = development | Validate the release in a production-like environment |
+| Production | `requires_approval`; `promote_from` = staging | Protected environment used by real users |
 
-Capabilities: show the current release and its status, compare versions across environments (to make promotion gaps visible), show per-environment history, configure health-check URL, interval, timeout and failure threshold, configure approval requirements and allowed roles, and **prevent conflicting production operations** on the same application.
+Capabilities: show the **current release** (`environments.current_deployment_id`) and the environment's **health**, compare versions across environments (to make promotion gaps visible), show per-environment history, configure health-check URL, interval, timeout, failure threshold and verification rule, and edit the environment policy:
+
+| Policy field | Meaning |
+|---|---|
+| `auto_deploy_on_release` | Create and dispatch a deployment as soon as a release is registered |
+| `requires_approval`, `min_approvals` | Reviewer gate and how many approvals are needed (default 1) |
+| `approval_ttl_hours`, `require_comment` | Request expiry and whether decisions need a comment |
+| `promote_from_environment_id` | The release must have a **Succeeded** deployment there first |
+| `rollback_requires_approval` | Whether rollbacks go through the gate too (default off: incidents need speed) |
+
+**At most one deployment per environment can be executing** (Queued, Deploying or Verifying). The database enforces it ([ADR-0003](adr/0003-deployment-aggregate.md)).
 
 ### 4.5 Production approval system *(core differentiator)*
-- Create a production deployment request for a specific release and environment.
-- Check preconditions (for example, a successful staging deployment and an acceptable release status).
-- Show pending requests with requester, release, commit, environment and request time.
-- Reviewers approve or reject, with an optional or required comment.
-- Record the reviewer's identity, decision, comment and timestamp.
-- Block unauthorized approval, duplicate approval and approval of **stale or expired** requests.
-- Optional: block self-approval and set a minimum reviewer count.
+- Request a deployment of a specific release to an environment whose policy requires approval.
+- Check preconditions: the release has a digest, it has a **Succeeded** deployment in the `promote_from` environment, and the requester has the role.
+- Freeze the policy on the deployment (`policy_snapshot`), so later policy edits don't change open requests.
+- Show pending requests with requester, release, commit, digest, promotion evidence, environment and request time.
+- Reviewers approve or reject, with an optional or required comment. Record identity, decision, comment and timestamp.
+- Block unauthorized approval, a second decision by the same reviewer, and **stale or expired** requests. *Stale* means the environment's current deployment changed after the request was made.
+- Optional: block self-approval (workspace setting) and require `min_approvals` reviewers.
 
-**Flow:** request v1.8.5 → verify the release exists and staging succeeded → *Awaiting approval* → the reviewer inspects it and decides → **approved:** record the decision and dispatch the production workflow in one transaction · **rejected:** no dispatch, and the decision is kept in the audit history.
+**Flow:** request v1.8.5 → preconditions → *Awaiting approval* → the reviewer decides → **approved:** record the decision, move to *Queued* and enqueue the dispatch job **in one transaction**; the worker dispatches · **rejected:** no dispatch, the decision stays in the history.
 
 ### 4.6 Deployment history and details
 Every attempt gets a durable record, whether it succeeds, fails or is cancelled, and even when a rollback follows.
@@ -215,15 +233,17 @@ Every attempt gets a durable record, whether it succeeds, fails or is cancelled,
 ### 4.7 Health monitoring
 A green CI job does not prove the application is healthy. ReleaseGuard runs a **small, predictable set of HTTP checks** after each deployment and on a schedule.
 - Per-environment endpoint (for example `/health`), expected status code, timeout, interval and consecutive-failure threshold.
-- Each check records timestamp, outcome, HTTP code and response time.
-- The environment is marked **unhealthy** once the threshold is reached.
-- Failures are linked to the deployment that most recently changed the environment.
+- **Verification** (right after a deploy): `verify_successes` consecutive passes (default 3) within `verify_timeout_seconds` (default 300) → **Succeeded**; `failure_threshold` consecutive failures, or the timeout → **Unhealthy**.
+- **Scheduled checks** (always): update `environments.health_status`. The environment turns **unhealthy** only after `failure_threshold` consecutive failures, so one transient failure changes nothing.
+- Each check records timestamp, kind (`verification` or `scheduled`), outcome, HTTP code and response time, and links to the environment's current deployment.
+- **SSRF guard:** only `http`/`https`, no redirects, and the resolved address must not be private, loopback or link-local (unless `HEALTH_CHECK_ALLOW_PRIVATE=true` in local dev). The URL is checked when saved and again before each request.
+- **Retention:** scheduled checks are kept for 14 days; verification checks are kept forever.
 - The UI shows current status and recent check history.
 
 > v1 uses HTTP endpoint checks only. No tracing, log aggregation or metrics storage. Prometheus and Grafana are optional extensions.
 
 ### 4.8 Controlled rollback
-Rollback **restores a known-good artifact**. It is a new deployment operation. The failed deployment is never deleted or changed. v1 supports **manual rollback only**. See [section 11](#11-rollback-design).
+Rollback **restores a known-good artifact**. It is a new deployment (`operation_type = rollback`) linked to the deployment it replaces, and it runs through the **same `deploy.yml` path** as every other deployment. The failed deployment is never deleted or changed. v1 supports **manual rollback only**. See [section 11](#11-rollback-design).
 
 ### 4.9 AI deployment assistant
 AI reduces the time needed to understand a failure. It is **not** a general chatbot and **not** an operator.
@@ -242,10 +262,10 @@ Example questions: *"What caused the last production deployment failure?"*, *"Ha
 ## 5. System architecture
 
 ### 5.1 Style: modular monolith
-The system has one Next.js app, one FastAPI backend, one PostgreSQL database and one small background worker.
+The system has one Next.js app, one FastAPI backend, one PostgreSQL database and one small background worker ([ADR-0001](adr/0001-modular-monolith.md)).
 - Business rules live in one backend codebase and can be tested together.
 - The data is relational and transactional, which suits approvals and state changes.
-- Monitoring and AI jobs run in a separate worker process, with no service mesh.
+- **The API never makes outbound network calls.** It writes state and jobs in one transaction and returns. The worker does all GitHub, health-check and AI I/O. No transaction is ever held open across a network call.
 - The system can be split later if a real scaling or ownership need appears.
 
 ### 5.2 Component diagram
@@ -253,12 +273,12 @@ The system has one Next.js app, one FastAPI backend, one PostgreSQL database and
 ```mermaid
 flowchart TB
     user([Team member / browser])
-    proxy[Reverse proxy<br/>Caddy or Nginx · TLS]
+    proxy[Caddy · TLS<br/>one origin: / and /api]
     fe[Next.js frontend<br/>Dashboard · releases · approvals · history]
-    be[FastAPI backend<br/>REST API · policies · state machine · integrations]
-    db[(PostgreSQL<br/>users · releases · deployments · audit)]
-    worker[Background worker<br/>health checks · retries · AI jobs]
-    gh[GitHub Actions<br/>CI · build · deploy · rollback]
+    be[FastAPI API<br/>REST · policies · state machine · webhook and OIDC intake]
+    db[(PostgreSQL<br/>state · jobs · audit)]
+    worker[Worker<br/>job loop · sweeps · dispatch · health · AI]
+    gh[GitHub Actions<br/>ci.yml · deploy.yml]
     ghcr[(GitHub Container Registry)]
     ai[LLM provider<br/>behind AIService]
     target[TaskFlow sample app<br/>dev · staging · prod]
@@ -266,11 +286,10 @@ flowchart TB
     user -->|HTTPS| proxy
     proxy --> fe
     proxy -->|/api| be
-    fe -->|HTTPS / JSON| be
     be -->|SQLAlchemy| db
     worker -->|SQLAlchemy| db
-    be -->|workflow_dispatch| gh
-    gh -->|signed webhooks / callbacks| be
+    worker -->|workflow_dispatch · runs · logs| gh
+    gh -->|workflow_run webhook · OIDC release callback| proxy
     gh -->|push image| ghcr
     gh -->|deploy by digest| target
     worker -->|HTTP health checks| target
@@ -281,16 +300,67 @@ flowchart TB
 
 | Component | Responsibility |
 |---|---|
+| **Caddy** | TLS, and one origin for the browser: `/` → frontend, `/api` → backend (no CORS in production). |
 | **Next.js frontend** | Dashboard, application configuration, release views, approvals, deployment details and rollback flows. |
-| **FastAPI backend** | REST API, validation, authorization, business policies, release and deployment state transitions, integrations. |
-| **PostgreSQL** | Durable records for users, workspaces, applications, environments, releases, deployments, approvals and audit events. |
+| **FastAPI API** | REST API, validation, sessions, authorization, policies, state transitions, webhook and OIDC intake. Writes jobs; never calls out. |
+| **PostgreSQL** | Source of truth: users, workspaces, applications, environments, releases, deployments, decisions, health checks, **jobs** and the append-only audit trail. |
 | **SQLAlchemy + Alembic** | ORM mapping, queries and versioned schema migrations. |
-| **Background worker** | Scheduled health checks, retryable tasks and asynchronous AI analysis. |
-| **GitHub Actions** | Build, test, scan, publish the image, deploy, and report the workflow outcome. |
+| **Worker** | Claims jobs (`FOR UPDATE SKIP LOCKED`): workflow dispatch, verification and scheduled health checks, AI analysis; runs the periodic sweeps (approval expiry, run reconciliation, retention). |
+| **GitHub Actions** | `ci.yml`: build, test, scan, publish, register the release. `deploy.yml`: deploy one digest to one environment. |
 | **Container registry (GHCR)** | Versioned Docker artifacts. Deploy by digest. |
 | **AI provider** | Structured failure explanations and release summaries, reached only through the isolated `AIService`. |
 
-### 5.4 Layering rules (backend)
+### 5.4 Backend services and how they relate
+
+```mermaid
+flowchart TB
+    subgraph API process
+        rel[release_service]
+        appr[approval_service]
+        rb[rollback_service]
+        wh[webhook_service]
+        dep[deployment_service<br/>transition · ALLOWED_TRANSITIONS]
+        audit[audit]
+    end
+    subgraph Worker process
+        jobs[job runner]
+        disp[dispatch job]
+        rec[reconcile sweep]
+        exp[expiry sweep]
+        hc[health_service]
+        ai[ai_service]
+        ghs[github_service]
+    end
+    rel --> dep
+    appr --> dep
+    rb --> dep
+    wh --> dep
+    exp --> dep
+    rec --> dep
+    hc --> dep
+    dep --> audit
+    appr --> audit
+    rb --> audit
+    rel --> audit
+    dep -. enqueue dispatch .-> jobs
+    jobs --> disp --> ghs
+    rec --> ghs
+    jobs --> ai --> ghs
+```
+
+| Service | Called by | Calls | Owns (writes) | Transaction |
+|---|---|---|---|---|
+| `deployment_service` | all services below | `audit`, job enqueue | `deployments.status`, `deployment_events`, `environments.current_deployment_id` | Inside the caller's transaction |
+| `release_service` | `POST /releases`, `POST /releases/ci` | `deployment_service` (auto-deploy) | `releases` | One per request |
+| `approval_service` | `POST /deployments`, `POST /deployments/{id}/decisions` | `deployment_service` | `approval_decisions` | Decision + transition + dispatch job together |
+| `rollback_service` | `POST /rollbacks` | `deployment_service` | the new rollback deployment | One per request |
+| `webhook_service` | `POST /github/webhooks` | `deployment_service` | `webhook_deliveries` | One per delivery |
+| `health_service` | worker | `deployment_service` (verification outcome) | `health_checks`, `environments.health_*` | One per check, after the HTTP call |
+| `github_service` | worker jobs only | GitHub REST | installation-token cache | **No transaction open** during HTTP |
+| `ai_service` | worker jobs only | LLM provider, `github_service` (logs) | `ai_failure_reports` | Writes after the call |
+| `audit` | every state-changing service | none | `audit_logs` (append-only) | Caller's transaction |
+
+### 5.5 Layering rules (backend)
 ```text
 HTTP route  →  service  →  repository / query function  →  database
   (thin)      (business      (data access only)
@@ -302,8 +372,9 @@ HTTP route  →  service  →  repository / query function  →  database
 - **Services own the rules:** permission checks, state transitions, transactions and integration calls.
 - **Repositories own data access:** no business logic.
 - Only `deployment_service` changes deployment status (see [section 8](#8-deployment-state-machine)).
+- Routes and services in the API process never call GitHub, the LLM or health URLs. They enqueue a job.
 
-### 5.5 Repository layout
+### 5.6 Repository layout
 
 ```text
 releaseguard/
@@ -328,10 +399,11 @@ releaseguard/
 │   │   ├── api/v1/           # applications, environments, releases, deployments,
 │   │   │                     # approvals, rollbacks, health, github (routers)
 │   │   ├── models/           # SQLAlchemy models
-│   │   ├── schemas/          # Pydantic request/response models
-│   │   ├── services/         # deployment, approval, rollback, health, github, ai
+│   │   ├── schemas/          # Pydantic request/response models (incl. job payloads, policy)
+│   │   ├── services/         # deployment, release, approval, rollback, webhook,
+│   │   │                     # health, github, ai, audit
 │   │   ├── repositories/
-│   │   └── worker/
+│   │   └── worker/           # job runner, job handlers, sweeps
 │   ├── migrations/           # Alembic
 │   ├── tests/
 │   ├── Dockerfile
@@ -347,7 +419,7 @@ releaseguard/
 └── README.md
 ```
 
-The TaskFlow sample app lives in a **separate repository** with its own `ci.yml`, `staging-deploy.yml`, `production-deploy.yml` and `rollback.yml` (see [section 10](#10-github-actions-integration)).
+The TaskFlow sample app lives in a **separate repository** with two workflows, `ci.yml` and `deploy.yml` (see [section 10](#10-github-actions-integration)).
 
 ---
 
@@ -363,7 +435,7 @@ The TaskFlow sample app lives in a **separate repository** with its own `ci.yml`
 | Validation | **Pydantic** | Validates API payloads **and** structured AI responses | [docs.pydantic.dev](https://docs.pydantic.dev/latest/) |
 | ORM | **SQLAlchemy 2.0** | Relational persistence, explicit database access | [docs.sqlalchemy.org](https://docs.sqlalchemy.org/en/20/) |
 | Migrations | **Alembic** | Versioned schema changes | [alembic.sqlalchemy.org](https://alembic.sqlalchemy.org/en/latest/) |
-| Database | **PostgreSQL** | Transactions, constraints, relationships, advisory locks | [postgresql.org/docs](https://www.postgresql.org/docs/) |
+| Database | **PostgreSQL** | Transactions, constraints, partial unique indexes, `SKIP LOCKED` | [postgresql.org/docs](https://www.postgresql.org/docs/) |
 | CI/CD | **GitHub Actions** | Repo-native workflows, dispatch API, workflow events | [docs.github.com/actions](https://docs.github.com/en/actions) |
 | Containers | **Docker + Docker Compose** | Repeatable local and server deployment | [docs.docker.com](https://docs.docker.com/) |
 | Registry | **GitHub Container Registry** | Versioned images, digest references | [docs.github.com/packages](https://docs.github.com/en/packages) |
@@ -377,12 +449,13 @@ The TaskFlow sample app lives in a **separate repository** with its own `ci.yml`
 
 | Concern | Choice | Notes |
 |---|---|---|
-| HTTP client (GitHub API, health checks) | `httpx` | Async, timeouts, works with retry wrappers |
-| Retries and backoff | `tenacity` | Bounded retries with exponential backoff for GitHub API calls |
+| HTTP client (GitHub API, health checks) | `httpx` | Async, timeouts, no redirects for health checks |
+| Retries and backoff | `tenacity` (in-process calls) + `jobs.run_after` backoff (across attempts) | Bounded retries with exponential backoff |
 | GitHub App auth | `PyJWT` + `cryptography` | Sign the App JWT, exchange it for short-lived installation tokens |
-| Password hashing | `argon2-cffi` (or `pwdlib`) | Modern password hashing; never store plaintext |
-| Sessions | Server-side sessions in Postgres + `HttpOnly`/`Secure`/`SameSite` cookie | Simpler and safer than storing JWTs in the browser |
-| Worker scheduling | `APScheduler` + Postgres job table (`SELECT … FOR UPDATE SKIP LOCKED`) | No extra infrastructure. ARQ/Redis is a later option if needed |
+| CI release auth | `PyJWT` `PyJWKClient` | Verify GitHub Actions OIDC tokens against GitHub's JWKS ([ADR-0006](adr/0006-release-registration-via-oidc.md)) |
+| Password hashing | `argon2-cffi` (or `pwdlib`) | argon2id; never store plaintext |
+| Sessions | Server-side sessions in Postgres + `HttpOnly`/`Secure`/`SameSite=Lax` cookie + Origin check | Same origin through Caddy ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md)) |
+| Worker | Plain async loop over a Postgres `jobs` table (`SELECT … FOR UPDATE SKIP LOCKED`) + interval sweeps | One mechanism for outbox, retries and schedules; no APScheduler or Redis ([ADR-0004](adr/0004-postgres-jobs-table.md)) |
 | Config | `pydantic-settings` | Typed settings from environment variables |
 | Type checking | `mypy` (backend), `tsc --noEmit` (frontend) | Run as CI gates |
 | Frontend data fetching | TanStack Query | Caching, polling for in-progress deployments |
@@ -402,7 +475,7 @@ The TaskFlow sample app lives in a **separate repository** with its own `ci.yml`
 
 ## 7. Data model
 
-PostgreSQL is the **source of truth**. The central modeling rule is to keep releases, deployment attempts, approval decisions and health observations as **separate records**.
+PostgreSQL is the **source of truth**. Releases, deployment attempts, approval decisions, health observations and audit entries are **separate records**. The deployment is the aggregate: its approval state, rollback link and policy snapshot live on it, so nothing has to be kept in sync ([ADR-0003](adr/0003-deployment-aggregate.md)).
 
 ### 7.1 Entity-relationship diagram
 
@@ -410,6 +483,7 @@ PostgreSQL is the **source of truth**. The central modeling rule is to keep rele
 erDiagram
     users ||--o{ workspace_members : "belongs to"
     workspaces ||--o{ workspace_members : has
+    users ||--o{ sessions : has
     workspaces ||--o{ applications : owns
     workspaces ||--o{ integrations : connects
     workspaces ||--o{ audit_logs : records
@@ -417,17 +491,17 @@ erDiagram
     applications ||--o{ releases : produces
     releases ||--o{ deployments : "deployed as"
     environments ||--o{ deployments : receives
+    environments |o--o| deployments : "current deployment"
+    deployments ||--o{ deployment_events : timeline
+    deployments ||--o{ approval_decisions : gets
+    deployments |o--o{ deployments : "rollback of"
     environments ||--o{ health_checks : monitored_by
-    deployments ||--o{ approval_requests : requires
-    approval_requests ||--o{ approval_decisions : gets
-    deployments ||--o{ health_checks : verified_by
+    deployments |o--o{ health_checks : verified_by
     deployments ||--o{ ai_failure_reports : analyzed_by
-    deployments ||--o{ rollback_events : "rolled back from"
-    releases ||--o{ rollback_events : "target of"
 
     users {
         uuid id PK
-        string email UK
+        citext email UK
         string display_name
         string password_hash
         string status
@@ -437,15 +511,33 @@ erDiagram
         uuid id PK
         string name
         string slug UK
-        jsonb settings
+        jsonb settings "block_self_approval"
         timestamptz created_at
     }
     workspace_members {
-        uuid workspace_id FK
-        uuid user_id FK
-        string role
+        uuid workspace_id PK
+        uuid user_id PK
+        string role "admin|developer|reviewer|viewer"
         string membership_status
         timestamptz joined_at
+    }
+    sessions {
+        uuid id PK
+        bytea token_hash UK
+        uuid user_id FK
+        uuid workspace_id FK
+        timestamptz expires_at
+        timestamptz last_seen_at
+    }
+    integrations {
+        uuid id PK
+        uuid workspace_id FK
+        string provider "github"
+        bigint installation_id UK
+        string account_login
+        jsonb permissions_summary
+        string status
+        timestamptz connected_at
     }
     applications {
         uuid id PK
@@ -454,31 +546,42 @@ erDiagram
         string description
         string repository_owner
         string repository_name
+        bigint repository_id
         string default_branch
+        string ci_workflow_path
+        string deploy_workflow_path
         string status
     }
     environments {
         uuid id PK
+        uuid workspace_id FK
         uuid application_id FK
-        string name
-        string environment_type
+        string environment_type "development|staging|production"
         string health_url
         int expected_status
-        int check_interval
-        int timeout
+        int check_interval_seconds
+        int timeout_ms
         int failure_threshold
-        jsonb approval_policy
+        int verify_successes
+        int verify_timeout_seconds
+        jsonb policy
+        uuid current_deployment_id FK
+        string health_status "unknown|healthy|unhealthy"
+        int consecutive_failures
+        timestamptz last_checked_at
+        timestamptz next_check_at
     }
     releases {
         uuid id PK
+        uuid workspace_id FK
         uuid application_id FK
         string version
         string commit_sha
         string branch
         string image_repository
         string image_tag
-        string image_digest
-        string build_status
+        string image_digest "sha256:..."
+        string source "ci|manual"
         bigint workflow_run_id
         uuid created_by FK
         text release_notes
@@ -486,105 +589,116 @@ erDiagram
     }
     deployments {
         uuid id PK
+        uuid workspace_id FK
         uuid release_id FK
         uuid environment_id FK
-        string operation_type
+        string operation_type "deploy|rollback"
         string status
         uuid requested_by FK
-        timestamptz started_at
-        timestamptz finished_at
+        jsonb policy_snapshot
+        timestamptz approval_expires_at
+        uuid base_deployment_id FK
+        uuid rollback_of_deployment_id FK
+        text reason
+        string idempotency_key
         bigint workflow_run_id
         string workflow_url
+        string error_code
         text error_summary
+        timestamptz created_at
+        timestamptz dispatched_at
+        timestamptz finished_at
     }
-    approval_requests {
+    deployment_events {
         uuid id PK
+        uuid workspace_id FK
         uuid deployment_id FK
-        string status
-        uuid requested_by FK
-        timestamptz requested_at
-        timestamptz expires_at
+        string from_status
+        string to_status
+        uuid actor_id FK
+        string source "user|policy|webhook|worker"
+        jsonb details
+        timestamptz created_at
     }
     approval_decisions {
         uuid id PK
-        uuid approval_request_id FK
+        uuid workspace_id FK
+        uuid deployment_id FK
         uuid reviewer_id FK
-        string decision
+        string decision "approve|reject"
         text comment
         timestamptz decided_at
     }
     health_checks {
         uuid id PK
-        uuid deployment_id FK
+        uuid workspace_id FK
         uuid environment_id FK
+        uuid deployment_id FK
+        string kind "verification|scheduled"
         timestamptz checked_at
-        string outcome
+        string outcome "pass|fail|blocked"
         int http_status
         int response_time_ms
         text error_message
     }
-    rollback_events {
+    ai_failure_reports {
         uuid id PK
-        uuid source_deployment_id FK
-        uuid rollback_deployment_id FK
-        uuid target_release_id FK
-        uuid requested_by FK
-        text reason
+        uuid workspace_id FK
+        uuid deployment_id FK
+        string status "ok|unavailable"
+        string model_provider
+        string model_id
+        int analysis_version
+        text summary
+        string category
+        string severity
+        text probable_cause
+        jsonb evidence_json
+        jsonb recommendations_json
         timestamptz created_at
     }
     audit_logs {
         uuid id PK
         uuid workspace_id FK
         uuid actor_id FK
+        string actor_type "user|system|ci"
         string action
         string target_type
         uuid target_id
         jsonb details_json
-        timestamptz created_at
-    }
-    integrations {
-        uuid id PK
-        uuid workspace_id FK
-        string provider
-        bigint installation_id
-        bigint repository_id
-        jsonb permissions_summary
-        timestamptz connected_at
-        string status
-    }
-    ai_failure_reports {
-        uuid id PK
-        uuid deployment_id FK
-        string model_provider
-        text summary
-        string category
-        text probable_cause
-        jsonb recommendations_json
+        string request_id
         timestamptz created_at
     }
 ```
 
-*(Recommendation)* Add a `webhook_deliveries` table (`delivery_id` UK, `event`, `received_at`, `processed_at`) for idempotent webhook handling, and a `deployment_events` table (`deployment_id`, `from_status`, `to_status`, `actor`, `source`, `created_at`) to drive the deployment timeline.
+Two infrastructure tables sit outside the diagram:
+
+| Table | Columns | Notes |
+|---|---|---|
+| `webhook_deliveries` | `delivery_id` PK, `event`, `received_at`, `processed_at`, `outcome` | Idempotent webhook intake |
+| `jobs` | `id`, `workspace_id` (nullable for global sweeps), `kind`, `payload` jsonb, `status` (`pending/running/done/dead`), `run_after`, `attempts`, `max_attempts`, `locked_until`, `last_error`, `dedupe_key` UK, `created_at`, `updated_at` | Outbox, retry queue and scheduler in one ([ADR-0004](adr/0004-postgres-jobs-table.md)) |
 
 ### 7.2 Key relationships
-- One workspace owns many applications and has many members.
-- One application has multiple environments and produces multiple releases.
-- One release can be deployed many times, including to different environments.
-- Each deployment references **exactly one** release and **one** environment.
-- A deployment can have one or more approval requests. Each request can have one or more decisions if the policy needs several reviewers.
-- A deployment can have many health-check observations.
-- A rollback event references the deployment rolled back **from**, the **new** rollback deployment and the **target** release.
-- Audit logs identify the workspace and actor and keep enough context to explain the action later.
+- One workspace owns many applications and has many members. **Every tenant table carries `workspace_id`**, and child tables reference their parent with a composite FK (for example `(application_id, workspace_id)` → `applications (id, workspace_id)`), so no row can point across workspaces.
+- One application has three environments (unique `(application_id, environment_type)`) and produces many releases.
+- One release can be deployed many times, to different environments.
+- Each deployment references **exactly one** release and **one** environment. A rollback deployment also references the deployment it replaces (`rollback_of_deployment_id`).
+- A deployment that needs approval has zero or more `approval_decisions`, at most one per reviewer.
+- `environments.current_deployment_id` is the deployment whose artifact is live: it is set when a deployment **enters Verifying**. (It and `deployments.environment_id` form a cycle; create the FK after both tables, nullable.)
+- A health check belongs to an environment and, when one exists, to the environment's current deployment at check time.
+- Audit logs identify the workspace, the actor (user, system or CI) and enough context to explain the action later.
 
 ### 7.3 Integrity, indexing and conventions
-- Foreign keys on all important relationships. **CHECK constraints** on status and decision values.
-- Unique constraints: workspace `slug`, application and repository identity, `(application_id, version)` on releases.
-- Indexes:
-  - `deployments (environment_id, created_at)`, `deployments (status, created_at)`, `deployments (release_id)`
-  - `approval_requests (status, requested_at)` and workspace access paths
-- **Transactions** wrap "approve a request + create the authorized dispatch operation".
+- Foreign keys on every relationship; never cascade-delete deployment, decision, event or audit history.
+- **CHECK constraints** on every status, decision, role, kind and `operation_type` value (mirrored in Python enums), and on `image_digest ~ '^sha256:[0-9a-f]{64}$'`.
+- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on applications, `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null).
+- **Single active deployment per environment:** `CREATE UNIQUE INDEX deployments_one_active_per_env ON deployments (environment_id) WHERE status IN ('queued','deploying','verifying')`. A unique violation maps to **409**.
+- **Indexes:** `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
+- **Append-only history:** a trigger rejects `UPDATE` and `DELETE` on `audit_logs` and `deployment_events`.
+- **Transactions** wrap "decision + transition + dispatch job" and every other state change with the jobs it implies.
 - **All timestamps are stored in UTC** (`timestamptz`) and rendered in the user's local timezone.
-- **Idempotency keys** for webhook processing and deployment-request creation.
+- **Idempotency:** webhook deliveries by `delivery_id`; deployment requests by `Idempotency-Key`; jobs by `dedupe_key`; CI release registration by `(application_id, version)` (same digest → 200, different digest → 409).
+- **Retention:** scheduled `health_checks` older than 14 days and `done` jobs older than 7 days are deleted by the worker. Nothing else is deleted.
 
 > **Auditability principle:** never update a failed deployment to "successful" when a rollback happens. Keep the failure as history, create a **new** rollback deployment, and link the two. Records describe what actually happened.
 
@@ -592,28 +706,25 @@ erDiagram
 
 ## 8. Deployment state machine
 
-Deployment status is a **state machine**, not a free-text field that any endpoint can overwrite. A **single backend service** (`deployment_service`) validates every transition.
+Deployment status is a **state machine**, not a free-text field that any endpoint can overwrite. A **single backend service** (`deployment_service`) validates every transition. Every non-terminal state has an owner that moves it on, and a timeout, so nothing gets stuck ([ADR-0003](adr/0003-deployment-aggregate.md)).
 
 ### 8.1 State diagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending
-    Pending --> AwaitingApproval: production policy
-    Pending --> Deploying: no approval needed
-    Pending --> Cancelled
-    AwaitingApproval --> Approved: reviewer approves
+    [*] --> AwaitingApproval: policy requires approval
+    [*] --> Queued: no approval needed
+    AwaitingApproval --> Queued: approvals reached
     AwaitingApproval --> Rejected: reviewer rejects
-    AwaitingApproval --> Cancelled
-    AwaitingApproval --> Expired: request timed out
-    Approved --> Deploying: workflow dispatched
-    Approved --> Cancelled
-    Deploying --> Verifying: workflow succeeded
-    Deploying --> Failed: workflow failed
-    Deploying --> Cancelled
-    Verifying --> Succeeded: health checks pass
-    Verifying --> Unhealthy: failure threshold reached
-    Verifying --> Failed
+    AwaitingApproval --> Expired: TTL passed (expiry sweep)
+    AwaitingApproval --> Cancelled: requester or admin
+    Queued --> Deploying: dispatch accepted (worker)
+    Queued --> Failed: dispatch retries exhausted
+    Queued --> Cancelled: requester or admin
+    Deploying --> Verifying: run succeeded (webhook or reconcile)
+    Deploying --> Failed: run failed, cancelled, or never appeared
+    Verifying --> Succeeded: verification passed
+    Verifying --> Unhealthy: threshold or timeout
     Succeeded --> [*]
     Rejected --> [*]
     Failed --> [*]
@@ -626,28 +737,31 @@ stateDiagram-v2
 
 ### 8.2 States
 
-| State | Meaning | Typical next state |
-|---|---|---|
-| **Pending** | Request created, not yet dispatched | Awaiting approval, Deploying, Cancelled |
-| **Awaiting approval** | Production policy requires a reviewer | Approved, Rejected, Cancelled, Expired |
-| **Approved** | Approval policy satisfied | Deploying, Cancelled |
-| **Deploying** | The GitHub Actions workflow is running | Verifying, Failed, Cancelled |
-| **Verifying** | The workflow finished; app health is being checked | Succeeded, Unhealthy, Failed |
-| **Succeeded** | Deployment and verification passed | *Terminal* |
-| **Rejected** | Approval denied | *Terminal*; a new request can be created |
-| **Failed** | The build or deploy operation failed | *Terminal*; retry as a **new** deployment |
-| **Unhealthy** | Deployed, but the post-deploy health policy failed | *Terminal*; a rollback can be created |
-| **Cancelled / Expired** | Cancelled, or the approval expired | *Terminal* |
+| State | Meaning | Owner that moves it on | Typical next state |
+|---|---|---|---|
+| **Awaiting approval** | The policy requires reviewers | Reviewers; expiry sweep | Queued, Rejected, Expired, Cancelled |
+| **Queued** | Authorized (by reviewers or by policy); dispatch job pending | Dispatch job | Deploying, Failed, Cancelled |
+| **Deploying** | Dispatched; the GitHub run is in progress | `workflow_run` webhook; reconcile sweep | Verifying, Failed |
+| **Verifying** | The run succeeded; the artifact is live and being checked | Verification job | Succeeded, Unhealthy |
+| **Succeeded** | Deployment and verification passed | — | *Terminal* |
+| **Rejected** | A reviewer rejected it | — | *Terminal*; a new request can be made |
+| **Failed** | Dispatch, the run, or run discovery failed (`error_code`: `dispatch_failed`, `run_failed`, `run_cancelled`, `run_not_found`) | — | *Terminal*; retry as a **new** deployment |
+| **Unhealthy** | Live, but verification failed | — | *Terminal*; a rollback can be created |
+| **Cancelled / Expired** | Withdrawn before dispatch, or the approval TTL passed | — | *Terminal* |
+
+Queued, Deploying and Verifying are **active**: at most one per environment.
 
 ### 8.3 Transition rules
-1. A production deployment **cannot** enter *Deploying* until its required approvals are recorded.
-2. An approval decision must come from an **authorized reviewer** and apply to the **current, unexpired** request.
-3. The service **rejects invalid transitions**, even when a client calls the API directly.
-4. **No concurrent production deployments** to the same application and environment. Use a Postgres advisory lock (`pg_advisory_xact_lock(hash(environment_id))`) or a well-defined job concurrency key.
-5. GitHub webhook deliveries are processed **idempotently**, so repeated callbacks never cause duplicate transitions.
-6. A retry creates a **new attempt** (or an explicitly modeled retry record). It never erases the failed attempt.
+1. A deployment is created in **Awaiting approval** or **Queued**, decided by the environment policy in the creating transaction. There is no observable "pending" state.
+2. A deployment whose policy requires approval **cannot** reach Queued until `min_approvals` approve decisions are recorded by authorized reviewers on the **current, unexpired, non-stale** request.
+3. The service **rejects invalid transitions** (409), even when a client calls the API directly. Terminal states never change.
+4. **No concurrent deployments to one environment:** the partial unique index on active statuses makes the database refuse a second one (409). Several requests can wait in Awaiting approval; whichever is approved first executes, and approving another while one is active returns 409.
+5. GitHub webhook deliveries are processed **idempotently**, and an event that implies a backwards or invalid move (for example `in_progress` after `completed`) is ignored and logged.
+6. Cancelling is possible only before dispatch (Awaiting approval, Queued). To stop a running deploy, cancel the run in GitHub; the webhook then moves the deployment to Failed (`run_cancelled`).
+7. A retry creates a **new** deployment. It never erases the failed attempt.
+8. Entering **Verifying** sets `environments.current_deployment_id`, because the new artifact is live from that moment.
 
-*(Recommendation)* Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, set[Status]]`, plus one function, `transition(deployment, to_status, actor, source)`. That function checks the table, writes a `deployment_events` row and an audit log entry, and runs inside the caller's transaction. Unit-test **every** allowed transition and a representative set of forbidden ones.
+Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset[Status]]`, plus one function, `transition(deployment, to_status, actor, source, details)`. It checks the table, sets timestamps, writes a `deployment_events` row and an audit entry, enqueues the follow-up job (dispatch for Queued, verification for Verifying, AI analysis for Failed/Unhealthy when AI is enabled), and runs inside the caller's transaction. Unit-test **every** allowed transition and every forbidden pair.
 
 ---
 
@@ -658,28 +772,30 @@ stateDiagram-v2
 | Area | Method & path | Purpose | Min. role |
 |---|---|---|---|
 | Auth | `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management | public / any |
-| Workspace | `GET /workspace` · `GET/POST/PATCH/DELETE /workspace/members[/{id}]` | Workspace and member management | Viewer / Admin |
+| Workspace | `GET /workspace` · `PATCH /workspace/settings` · `GET/POST/PATCH/DELETE /workspace/members[/{id}]` | Workspace, `block_self_approval`, members | Viewer / Admin |
 | Dashboard | `GET /dashboard/summary?from=&to=` | Summary cards, environment matrix, recent activity | Viewer |
 | Applications | `GET/POST /applications` · `GET/PATCH /applications/{id}` · `POST /applications/{id}/archive` | Application CRUD | Viewer / Developer |
-| Environments | `GET /applications/{id}/environments` · `GET/PATCH /environments/{id}` | Environment config, health and approval policy | Viewer / Admin |
-| Releases | `GET /applications/{id}/releases` · `GET /releases/{id}` · `POST /releases` | List, view, register (CI callback or manual) | Viewer / Developer |
+| Environments | `GET /applications/{id}/environments` · `GET/PATCH /environments/{id}` | Health config and environment **policy** | Viewer / Admin |
+| Releases | `GET /applications/{id}/releases` · `GET /releases/{id}` · `POST /releases` | List, view, manual registration (fallback) | Viewer / Developer |
+| | `POST /releases/ci` | CI registration with a **GitHub OIDC bearer token**; no session | CI (OIDC) |
 | Deployments | `GET /deployments?app=&env=&status=&actor=&from=&to=` · `GET /deployments/{id}` · `GET /deployments/{id}/events` | History, details, timeline | Viewer |
-| | `POST /deployments` (`Idempotency-Key` header) · `POST /deployments/{id}/cancel` | Request a deployment; cancel | Developer |
-| Approvals | `GET /approvals?status=pending` · `GET /approvals/{id}` · `POST /approvals/{id}/decisions` | Inbox; approve or reject with comment | Viewer / Reviewer |
-| Rollbacks | `GET /environments/{id}/rollback-candidates` · `POST /rollbacks` | List eligible releases; start a rollback | Developer |
-| Health | `GET /environments/{id}/health` · `GET /environments/{id}/health-checks` · `POST /environments/{id}/health/check-now` | Current status, history, on-demand check | Viewer / Admin |
+| | `POST /deployments` (`Idempotency-Key` header) · `POST /deployments/{id}/cancel` | Request a deployment (created Awaiting approval or Queued); cancel before dispatch | Developer |
+| Approvals | `GET /approvals?status=pending` | Inbox: deployments in Awaiting approval, with release and promotion evidence | Viewer |
+| | `POST /deployments/{id}/decisions` | Approve or reject with comment | Reviewer |
+| Rollbacks | `GET /environments/{id}/rollback-candidates` · `POST /rollbacks` | Eligible releases; start a rollback (target release, reason) | Developer |
+| Health | `GET /environments/{id}/health` · `GET /environments/{id}/health-checks` · `POST /environments/{id}/health/check-now` | Current status, history, enqueue an immediate check | Viewer / Admin |
 | GitHub | `POST /github/webhooks` (HMAC-verified, no session) · `GET /integrations` · `POST /integrations/github/callback` · `DELETE /integrations/{id}` | Webhook intake; App install and uninstall | system / Admin |
-| AI | `POST /deployments/{id}/ai-analysis` · `GET /deployments/{id}/ai-analysis` · `POST /releases/{id}/release-notes` | Request or view AI analysis and release notes | Viewer / Developer |
+| AI | `POST /deployments/{id}/ai-analysis` · `GET /deployments/{id}/ai-analysis` · `POST /releases/{id}/release-notes` | Enqueue or view AI analysis and release notes | Viewer / Developer |
 | Audit | `GET /audit-logs?target_type=&target_id=&actor=` | Audit trail | Viewer |
 | Ops | `GET /healthz` · `GET /readyz` | Liveness and readiness of ReleaseGuard itself | public |
 
-**Conventions:** JSON everywhere; cursor or page pagination on lists; errors use the shape `{ "error": { "code", "message", "details" } }`; return `403` for permission failures, `404` for resources in other workspaces (to avoid leaking that they exist), `409` for invalid state transitions or lock conflicts, and `422` for validation errors.
+**Conventions:** JSON everywhere; cursor or page pagination on lists; errors use the shape `{ "error": { "code", "message", "details" } }`. Status codes: `401` missing or invalid session, signature or OIDC token; `403` role failure, self-approval, or a foreign `Origin` on a state-changing request; `404` for resources in other workspaces (never confirm they exist); `409` invalid transition, an environment that already has an active deployment, a stale request, or a duplicate decision; `422` validation and ineligible targets. Endpoints that trigger GitHub, health or AI work return `202` with the deployment or job reference; the work happens in the worker.
 
 ---
 
 ## 10. GitHub Actions integration
 
-GitHub Actions **executes** CI/CD. ReleaseGuard **triggers** controlled workflows and **receives** events to sync status, through a **GitHub App** with minimum permissions.
+GitHub Actions **executes** CI/CD. ReleaseGuard **triggers** one controlled workflow and **receives** events to sync status, through a **GitHub App** with minimum permissions. All outbound GitHub calls run in the worker.
 
 ### 10.1 End-to-end flow
 
@@ -687,48 +803,57 @@ GitHub Actions **executes** CI/CD. ReleaseGuard **triggers** controlled workflow
 sequenceDiagram
     autonumber
     actor Dev as Developer
-    participant GH as GitHub Actions
+    participant CI as TaskFlow ci.yml
     participant REG as GHCR
     participant RG as ReleaseGuard API
+    participant W as Worker
+    participant GH as GitHub Actions (deploy.yml)
     actor Rev as Reviewer
-    participant App as TaskFlow (prod)
+    participant App as TaskFlow env
 
-    Dev->>GH: git push (TaskFlow)
-    GH->>GH: ci.yml: lint, tests, security checks
-    GH->>REG: build & push image
-    GH->>RG: signed callback (version, SHA, tag, digest, run_id)
-    RG->>RG: register release, then trigger staging if policy allows
-    Dev->>RG: request production deployment
-    RG->>RG: verify policy and staging success → Awaiting approval
-    Rev->>RG: approve (comment)
-    RG->>GH: workflow_dispatch production-deploy.yml (release_id, image_digest, environment, deployment_id)
+    Dev->>CI: git push
+    CI->>CI: lint, tests, Trivy
+    CI->>REG: build & push image
+    CI->>RG: POST /releases/ci (OIDC token, version, SHA, tag, digest, run_id)
+    RG->>RG: register release, dev deployment Queued (policy) + dispatch job
+    W->>GH: workflow_dispatch deploy.yml (release_id, image_digest, environment, deployment_id)
+    GH-->>W: run id + URL (return_run_details)
+    W->>RG: Queued → Deploying
     GH->>REG: pull exact digest
     GH->>App: deploy
-    GH->>RG: workflow_run webhook (completed / conclusion)
-    RG->>App: HTTP health checks (worker)
-    RG->>RG: Succeeded or Unhealthy
+    GH->>RG: workflow_run completed (signed webhook)
+    RG->>RG: Deploying → Verifying, environment points to the release
+    W->>App: verification health checks
+    W->>RG: Verifying → Succeeded or Unhealthy
+    Note over Dev,RG: staging: same path (auto or requested)
+    Dev->>RG: request production → Awaiting approval
+    Rev->>RG: approve → Queued + dispatch job (one transaction)
 ```
 
 ### 10.2 Workflow files (in the TaskFlow repository)
 
 | File | Trigger | Responsibility |
 |---|---|---|
-| `ci.yml` | push / PR | Lint, tests, security checks, build and publish image, report release to ReleaseGuard |
-| `staging-deploy.yml` | `workflow_dispatch` (or after CI) | Deploy a release to staging |
-| `production-deploy.yml` | `workflow_dispatch` **only** | Deploy **only** an approved release |
-| `rollback.yml` | `workflow_dispatch` | Redeploy a selected, previously published image digest |
+| `ci.yml` | push / PR | Lint, tests, Trivy, build and publish the image, capture the digest; on the default branch or a tag, register the release with an OIDC token (`permissions: id-token: write`) |
+| `deploy.yml` | `workflow_dispatch` **only** | Deploy one digest to one environment. Used for every environment **and** for rollback ([ADR-0005](adr/0005-single-deploy-workflow.md)) |
 
-These can be combined during early prototyping. Keep them separate once the approval and rollback paths exist, because separate files are easier to reason about.
+`deploy.yml` sets `run-name: deploy-${{ inputs.deployment_id }}` and `environment: ${{ inputs.environment }}` on its job, so GitHub environment protection rules and environment-scoped secrets apply to production. Its steps: validate the digest format → pull `ghcr.io/<owner>/taskflow@<digest>` → check that the pulled digest matches → deploy to the environment's Compose project.
 
-### 10.3 Dispatch inputs and callback contract
-- **Inputs:** `release_id`, `image_digest`, `environment`, `deployment_id`. **Never** accept arbitrary shell commands from the API or the AI.
-- The workflow **checks** that the artifact it deploys matches the approved release.
-- The backend stores the GitHub `workflow_run_id` and URL.
-- Status arrives through **signed webhooks** (`workflow_run`, `workflow_job`) or an authenticated callback endpoint. Both are protected by signature validation, authorization and idempotency.
-- *(Recommendation)* Correlate dispatches to runs by passing `deployment_id` as an input and setting `run-name: deploy-${{ inputs.deployment_id }}` in the workflow, then matching on that name in the `workflow_run` event.
+### 10.3 Dispatch inputs, correlation and callbacks
+- **Inputs:** exactly `release_id`, `image_digest`, `environment` (`development|staging|production`), `deployment_id`. **Never** accept arbitrary shell commands, refs or targets from the API or the AI.
+- **Dispatch** is a job. The worker calls the dispatch API with `return_run_details: true` and stores the returned run id and URL, then moves the deployment to Deploying. Transient errors retry with backoff; after `max_attempts` the deployment becomes Failed (`dispatch_failed`). *(Check the response field names against the live API when implementing; the feature shipped in Feb 2026.)*
+- **Status** arrives through signed `workflow_run` webhooks. Each event is accepted only if its repository id, workflow path and `run-name` (`deploy-<deployment_id>`) match the deployment; otherwise it is logged and ignored.
+- **Reconcile sweep** (worker, every 60 s): a deployment in Deploying with no update for 5 minutes has its run read from the API. If the run concluded, apply the result. If no run exists after `DISPATCH_TIMEOUT_SECONDS`, mark it Failed (`run_not_found`). This covers lost webhooks and tunnel outages.
+- **Release registration:** `POST /releases/ci` verifies the OIDC JWT against GitHub's JWKS (`iss`, `aud` = `GITHUB_OIDC_AUDIENCE`, `exp`) and binds it to the application: `repository_id` equals the stored repository id, `workflow_ref` is the configured CI workflow on the default branch or a tag, and `sha` equals the body's commit SHA ([ADR-0006](adr/0006-release-registration-via-oidc.md)).
 
-### 10.4 Defense in depth
-Where the GitHub plan allows, configure **GitHub environment protection rules and required reviewers** on the `production` environment as a second layer. ReleaseGuard still enforces its own policy, so the product logic never depends on GitHub plan features.
+### 10.4 GitHub App
+- **Permissions:** Actions read/write (dispatch, runs, logs), Contents read, Metadata read. Nothing else.
+- **Webhook events:** `workflow_run` only.
+- Short-lived installation tokens, cached and refreshed before expiry, used only in the worker.
+- A separate development App (webhooks through a smee.io or cloudflared tunnel) and a production App.
+
+### 10.5 Defense in depth
+Configure **GitHub environment protection rules** on the `production` environment (required reviewers where the plan allows, and a deployment-branch rule). ReleaseGuard still enforces its own policy, so the product logic never depends on GitHub plan features.
 
 > **Separation of duties:** ReleaseGuard decides whether a release may proceed. GitHub Actions performs the build and deployment. The backend never runs deployment shell commands.
 
@@ -736,31 +861,30 @@ Where the GitHub plan allows, configure **GitHub environment protection rules an
 
 ## 11. Rollback design
 
-A rollback is a **controlled redeployment of a previously published artifact**. Do not rebuild old source during an incident. Restore the exact, previously tested **image digest**.
+A rollback is a **controlled redeployment of a previously published artifact**. Do not rebuild old source during an incident. Restore the exact, previously tested **image digest**, through the same `deploy.yml` path every deployment uses.
 
 ### 11.1 Manual rollback sequence
 1. The user opens an unhealthy deployment or environment page.
-2. ReleaseGuard lists **eligible** earlier successful releases for that application and environment.
-3. The user picks a target and enters a **reason**.
-4. The backend checks permissions, target eligibility, environment policy and **concurrency**.
-5. If the policy requires approval for rollback, an approval request is created. Otherwise the flow continues.
-6. A **new** deployment record is created with `operation_type = rollback` and the target release.
-7. The `rollback.yml` workflow is dispatched with the target **image digest**.
-8. ReleaseGuard tracks completion and runs post-rollback health checks.
-9. The rollback deployment is marked Succeeded or Unhealthy, and the full event chain is kept.
+2. ReleaseGuard lists **eligible** targets: releases that have a **Succeeded** deployment in this environment, have a digest, and are not the environment's current release.
+3. The user picks a target and enters a **reason**; the dialog shows current vs. target version and digest.
+4. The backend checks permissions, eligibility and the environment policy.
+5. A **new** deployment is created with `operation_type = rollback`, the target release and `rollback_of_deployment_id` = the environment's current deployment. If `rollback_requires_approval` is on, it starts in Awaiting approval; otherwise in Queued with a dispatch job. If another deployment is active in the environment, the database refuses it (409).
+6. The worker dispatches `deploy.yml` with the target **image digest**.
+7. ReleaseGuard tracks completion and runs verification.
+8. The rollback deployment ends Succeeded or Unhealthy. The original keeps its status, and both are linked.
 
 | Example | Value |
 |---|---|
 | Current production | v1.8.5, **Unhealthy** |
-| Previous stable | v1.8.2, previously healthy |
+| Previous stable | v1.8.2, previously Succeeded in production |
 | Operation | Deploy the immutable artifact for v1.8.2 |
-| Result | New rollback deployment record, followed by health checks |
+| Result | New rollback deployment record, followed by verification |
 
 ### 11.2 Safeguards
-- Only known releases with a **published artifact** can be selected.
+- Only releases with a **published artifact** that previously **succeeded in this environment** can be selected.
 - Current and target versions are both clearly shown **before** confirmation.
 - Targets that break the environment policy are blocked.
-- A per-environment deployment lock or concurrency key applies.
+- The single-active-deployment index applies to rollbacks too.
 - Explicit confirmation is required and the reason is recorded.
 - Health is verified after the rollback workflow completes.
 - The original failed deployment is kept and **linked** to the rollback.
@@ -772,7 +896,7 @@ Add it only after manual rollback is proven. A conservative first rule: create a
 
 ## 12. AI deployment assistant
 
-All AI calls go through a dedicated **`AIService`**. **Deployments never depend on the AI provider.** A deployment succeeds or fails normally even if AI is down.
+All AI calls go through a dedicated **`AIService`**, and they run only as **worker jobs** (`kind = ai_analysis` / `ai_release_notes`). When a deployment becomes Failed or Unhealthy and AI is enabled, `transition()` enqueues an analysis job; users can also request one. **Deployments never depend on the AI provider.** A deployment succeeds or fails normally even if AI is down.
 
 ### 12.1 Service methods
 
@@ -835,33 +959,39 @@ Store the provider and model identifier, creation timestamp, related deployment 
 ReleaseGuard has authority over production release decisions, so security is part of the architecture from the start.
 
 ### 13.1 Authentication and authorization
-- Secure server-side sessions (or a carefully built token model). Hash passwords with a modern algorithm (argon2).
+- Server-side sessions in Postgres: the cookie holds a random id, the table stores its hash; idle timeout 12 h, absolute 7 days, rotated on login ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md)). Passwords hashed with argon2id.
+- **CSRF:** one origin through Caddy, `SameSite=Lax` cookie, and an Origin check on every unsafe method (403 on mismatch). The webhook and OIDC endpoints are exempt because they don't use cookies.
 - Check workspace membership on **every** operation, and run RBAC checks in the **service layer**.
 - Use short-lived, least-privilege GitHub credentials (installation tokens).
 
-### 13.2 GitHub and webhook security
-- Use a **GitHub App** rather than a broad personal access token.
-- Request only the repository and Actions permissions the selected workflows need.
-- Keep private keys, installation tokens and webhook secrets **on the backend only**.
-- Validate webhook signatures with **HMAC-SHA256** (`X-Hub-Signature-256`) and a **constant-time comparison**.
-- Reject duplicate deliveries using `X-GitHub-Delivery` IDs or idempotency records.
+### 13.2 GitHub, webhook and CI security
+- Use a **GitHub App** rather than a broad personal access token: Actions RW, Contents R, Metadata R; `workflow_run` events only.
+- Keep private keys, installation tokens and webhook secrets **on the backend and worker only**.
+- Validate webhook signatures with **HMAC-SHA256** (`X-Hub-Signature-256`) and a **constant-time comparison**, before parsing the body.
+- Reject duplicate deliveries using `X-GitHub-Delivery` IDs.
+- Authenticate CI release registration with **GitHub OIDC** and bind the token's `repository_id`, `workflow_ref` and `sha` to the application. No shared secret.
 - Rotate and revoke credentials when an integration is disconnected.
 
 ### 13.3 Deployment safety
 - No arbitrary deployment commands from users or from AI output.
-- Deploy **immutable digests**, or enforce immutable tags.
+- Deploy **immutable digests** only.
 - Keep environment-specific secrets out of source code and frontend bundles.
-- Restrict production deployment concurrency.
-- Check that each workflow run matches the requested release and environment.
-- Record approval, dispatch, start, finish, failure and rollback events.
+- **One active deployment per environment**, enforced by a partial unique index.
+- Check that each workflow run matches the expected repository, workflow and `run-name`.
+- Record request, decision, dispatch, start, finish, failure and rollback events.
 
-### 13.4 Reliability and operational controls
-- Bounded retries with **exponential backoff** for transient GitHub API failures.
-- **Idempotent** webhook and callback handlers.
-- Database **transactions** around approval decisions and the state changes that go with them.
-- Background jobs that are retryable and observable.
+### 13.4 Health-check SSRF guard
+Health URLs are fetched from inside the VPS, so a bad URL could reach Postgres or metadata endpoints. Allow only `http`/`https`, resolve the host and refuse private, loopback, link-local and multicast addresses (unless `HEALTH_CHECK_ALLOW_PRIVATE=true` for local dev), don't follow redirects, cap the response size, and re-check the resolved address on every request (DNS can change).
+
+### 13.5 Reliability and operational controls
+- Bounded retries with **exponential backoff** for transient GitHub API failures (jobs table).
+- **Idempotent** webhook, CI and deployment-request handlers.
+- Database **transactions** around each state change and the jobs it implies.
+- Every non-terminal deployment state has an owner and a timeout (expiry and reconcile sweeps).
+- Background jobs are retryable and visible in the `jobs` table; dead jobs are surfaced on the dashboard.
+- **Append-only** `audit_logs` and `deployment_events` (trigger).
 - PostgreSQL backups, with **regular restore tests**.
-- **Correlation IDs** in logs for requests, deployments and GitHub workflow runs.
+- **Correlation IDs** in logs for requests, deployments, jobs and GitHub workflow runs.
 
 ---
 
@@ -888,11 +1018,11 @@ The team works in **vertical slices**. Each sprint ends with something working t
 
 ### 14.2 Branching, commits and versioning
 - **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required).
-- Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge within 1–3 days.
+- Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge within 1–2 days.
 - **Conventional Commits:** `feat(api): block self-approval when policy enabled`. Scopes: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra`, `docs`.
 - **Squash-merge** PRs so `main` has one commit per change.
 - **SemVer tags** for ReleaseGuard releases (`v0.1.0` at the end of Sprint 1, … `v1.0.0` at MVP). Generate the changelog from the commits.
-- Record significant technical decisions as **ADRs** in `docs/adr/NNNN-title.md` (context, decision, consequences). Suggested first ADRs: modular monolith; server-side sessions; worker on a Postgres job table; deploy by digest.
+- Record significant technical decisions as **ADRs** in `docs/adr/NNNN-title.md` (context, decision, alternatives, consequences) with `/new-adr`. Accepted so far: [0001](adr/0001-modular-monolith.md) modular monolith · [0002](adr/0002-deploy-by-image-digest.md) deploy by digest · [0003](adr/0003-deployment-aggregate.md) deployment aggregate · [0004](adr/0004-postgres-jobs-table.md) jobs table · [0005](adr/0005-single-deploy-workflow.md) one deploy workflow · [0006](adr/0006-release-registration-via-oidc.md) OIDC release registration · [0007](adr/0007-server-side-sessions-and-csrf.md) sessions and CSRF.
 
 ### 14.3 Definition of Ready (DoR)
 An issue is **Ready** when it has:
@@ -934,8 +1064,9 @@ For a solo developer, **self-review the diff the next day** before merging, and 
 ```bash
 cp .env.example .env                 # fill in local values
 docker compose -f infra/docker-compose.yml up -d db   # Postgres only
-cd backend && uv sync && alembic upgrade head && python -m app.scripts.seed
-uvicorn app.main:app --reload        # http://localhost:8000/docs
+cd backend && uv sync && uv run alembic upgrade head && uv run python -m app.scripts.seed
+uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
+uv run python -m app.worker                 # worker (second terminal)
 cd ../frontend && pnpm install && pnpm dev   # http://localhost:3000
 # or everything at once:
 docker compose -f infra/docker-compose.yml up --build
@@ -952,9 +1083,13 @@ docker compose -f infra/docker-compose.yml up --build
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…` |
 | `SESSION_SECRET` | backend | Random 32+ bytes |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*` |
+| `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
+| `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
+| `DISPATCH_TIMEOUT_SECONDS` | worker | How long a deployment may wait for its GitHub run before `run_not_found` (default 600) |
+| `HEALTH_CHECK_ALLOW_PRIVATE` | worker | `true` only in local dev, to allow health URLs on private addresses (default `false`) |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | worker | AI can be disabled by leaving the key empty |
-| `NEXT_PUBLIC_API_BASE_URL` | frontend | The only public variable |
-| `CORS_ORIGINS`, `LOG_LEVEL`, `ENV` | backend | |
+| `NEXT_PUBLIC_API_BASE_URL` | frontend | The only public variable (`/api/v1` behind Caddy) |
+| `CORS_ORIGINS`, `LOG_LEVEL`, `ENV` | backend | `CORS_ORIGINS` is used only when `ENV=local` (frontend and API on different ports) |
 
 ### 14.7 Environments for ReleaseGuard itself
 
@@ -997,11 +1132,11 @@ flowchart TB
 
 | Layer | Scope | Tool | Target |
 |---|---|---|---|
-| Unit | Services, permission rules, state transitions, log sanitizer, AI response schema | pytest | **100% of state-machine transitions and permission rules**; ≥ 80% of the services package |
-| Integration | Repositories, transactions, approval → dispatch, GitHub callback handling (GitHub API mocked with `respx`) | pytest + Postgres container | All service-level flows |
-| API | Authentication, authorization, validation, **workspace isolation** | pytest + `httpx.AsyncClient` | Every router has allowed, denied and cross-workspace tests |
+| Unit | Services, permission rules, state transitions, policy evaluation, SSRF guard, log sanitizer, AI response schema | pytest | **100% of state-machine transitions and permission rules**; ≥ 80% of the services package |
+| Integration | Repositories, constraints (single active deployment, append-only triggers), approval → job → dispatch, job runner and sweeps, webhook handling, OIDC verification (local JWKS), GitHub mocked with `respx` | pytest + Postgres container | All service-level flows |
+| API | Authentication, authorization, validation, **workspace isolation**, CSRF Origin check | pytest + `httpx.AsyncClient` | Every router has allowed, denied and cross-workspace tests |
 | E2E | Request → approve → status update → rollback UI | Playwright | The demo script runs green |
-| Failure-path | GitHub API timeout, duplicate webhook, rejected approval, unhealthy endpoint, rollback failure, AI unavailable | pytest (+ Playwright) | Each has at least one test |
+| Failure-path | GitHub dispatch timeout and retries exhausted, run never appears, lost webhook (reconcile), duplicate and out-of-order webhooks, invalid OIDC token or claim mismatch, rejected/expired/stale approval, concurrent deployment 409, unhealthy endpoint, SSRF-blocked URL, rollback failure, AI unavailable | pytest (+ Playwright) | Each has at least one test |
 | Frontend unit | Status badges, formatters, hooks | Vitest + Testing Library *(recommendation)* | Key components |
 
 **Test data:** factories (`factory_boy` or plain builders); each test runs in a transaction that is rolled back. **Never** call the real GitHub or AI APIs in CI. Use mocks and recorded fixtures.
@@ -1083,9 +1218,9 @@ Six vertical slices. Each one ends in a working demo. Full detail: [PROJECT_PLAN
 | Phase | Weeks | Scope | Definition of done |
 |---|---|---|---|
 | 1. Foundation | 1–2 | Next.js, FastAPI, Postgres, migrations, auth, workspace roles, app and env CRUD | A user can sign in, create an app and configure its environments |
-| 2. Releases and tracking | 3–4 | Release registration, deployment records, state transitions, history pages, GitHub CI integration | A real CI run creates a release, and its staging deployment is visible |
-| 3. Approval engine | 5–6 | Reviewer permissions, approval requests and decisions, audit events, production dispatch | A production deployment cannot proceed without the required approval |
-| 4. Health and rollback | 7–8 | Scheduled HTTP checks, env health, manual rollback, post-rollback verification | A failed or unhealthy release can be replaced by an earlier known-good artifact |
+| 2. Releases and tracking | 3–4 | OIDC release registration, `deploy.yml`, worker + jobs table, dispatch, webhooks, reconcile, state machine, history pages | A real CI run creates a release, and its dev and staging deployments are tracked live |
+| 3. Approval engine | 5–6 | Environment policy, decisions, expiry and stale rules, production gate, audit UI | A production deployment cannot proceed without the required approval |
+| 4. Health and rollback | 7–8 | Verification and scheduled HTTP checks, SSRF guard, env health, manual rollback | A failed or unhealthy release can be replaced by an earlier known-good artifact |
 | 5. AI assistant | 9–10 | Sanitized log analysis, structured summaries, release notes, saved reports | A failed deployment shows a useful AI explanation without controlling operations |
 | 6. DevOps delivery | 11–12 | Dockerization, CI for ReleaseGuard, test automation, Trivy, VPS deploy, backups, monitoring | The platform is deployed and the end-to-end demo is repeatable |
 
@@ -1150,9 +1285,11 @@ Use this **only after** the matching features are actually implemented. Remove a
 
 | Risk | Why it matters | Mitigation |
 |---|---|---|
-| GitHub integration complexity | Dispatch, webhook delivery and permissions can each fail independently | Start with one repo and one workflow path; store run IDs; idempotent callbacks; retries |
-| Incorrect deployment status | Callbacks can arrive twice or out of order | Validate transitions; use event timestamps and run IDs; ignore duplicate deliveries |
-| Unsafe production action | A permission bug could allow an unauthorized deployment | Backend RBAC, approval policy, audit logs, environment concurrency locks |
+| GitHub integration complexity | Dispatch, webhook delivery and permissions can each fail independently | One repo and **one** deploy workflow; run id from the dispatch response; idempotent webhooks; job retries; reconcile sweep |
+| Incorrect deployment status | Callbacks can arrive twice, out of order, or not at all | Validate transitions; match run id and `run-name`; ignore duplicates; reconcile stuck deployments from the API |
+| Unsafe production action | A permission bug could allow an unauthorized deployment | Backend RBAC, frozen approval policy, audit logs, DB-enforced single active deployment |
+| Forged release registration | Anyone who can call the API could register a malicious digest | GitHub OIDC bound to repository id, workflow and SHA; promotion rules before production |
+| SSRF through health URLs | The worker runs inside the VPS network | SSRF guard: scheme allowlist, private-address block, no redirects |
 | Mutable image tag | A tag could later point to a different artifact | Store and deploy the **digest** |
 | False health signal | One request can fail because of a transient network issue | Timeout, threshold and consecutive-failure policy; keep deployment status separate from env health |
 | AI hallucination or sensitive log exposure | Wrong causes; logs may contain secrets | Sanitize and minimize logs; validate structured output; label hypotheses; AI is read-only |

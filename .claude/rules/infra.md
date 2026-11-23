@@ -17,6 +17,8 @@ paths:
 ## Compose
 - `infra/docker-compose.yml` for local development (db, backend, frontend, worker).
 - Production Compose services: `proxy` (Caddy, automatic TLS) · `frontend` · `backend` · `worker` · `db`.
+- Caddy serves **one origin**: `/` → frontend, `/api/*` → backend (including `/api/v1/github/webhooks` and `/api/v1/releases/ci`). No CORS in production (ADR-0007).
+- The worker needs outbound access to GitHub, the LLM provider and the TaskFlow health URLs. It needs no published port.
 - Postgres uses a **named volume** and is **never exposed publicly** (internal network only).
 - Pin production images by digest in `.env` (`BACKEND_IMAGE=ghcr.io/…@sha256:…`), so rolling back ReleaseGuard itself means changing the digest and running `docker compose up -d`.
 - Give services healthchecks. The backend depends on db being healthy.

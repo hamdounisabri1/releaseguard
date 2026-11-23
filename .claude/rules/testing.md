@@ -16,19 +16,20 @@ paths:
 | Layer | Tool | Must cover |
 |---|---|---|
 | Unit | pytest | **Every** allowed state transition plus representative forbidden ones; every permission rule; policies; log sanitizer; AI response schema |
-| Integration | pytest + real Postgres | Repositories, transactions, approval → outbox → dispatch, webhook handling |
-| API | pytest + `httpx.AsyncClient` | Every router: **allowed, denied and cross-workspace** cases |
+| Integration | pytest + real Postgres | Repositories, constraints (single active deployment, append-only triggers), approval → job → dispatch, job runner and sweeps, webhook handling, OIDC verification with a local JWKS |
+| API | pytest + `httpx.AsyncClient` | Every router: **allowed, denied and cross-workspace** cases; a state-changing request with a foreign `Origin` returns 403 |
 | E2E | Playwright | The demo journey: login → request → approve → status update → rollback |
 | Frontend unit | Vitest + Testing Library | Status badges, formatters, hooks |
 
 Targets: 100% of state-machine transitions and permission rules; ≥ 80% of the services package.
 
 ## Required failure-path tests
-Each needs at least one test: GitHub API timeout (retry, then consistent state) · invalid webhook signature · duplicate webhook delivery · out-of-order webhook event · rejected approval · expired or stale approval · self-approval blocked · concurrent production request returns 409 · unhealthy endpoint and threshold logic (one transient failure doesn't flip state) · rollback to an ineligible target · rollback workflow failure · AI provider unavailable (the deployment flow is unaffected) · prompt-injection fixture doesn't change the output schema.
+Each needs at least one test: GitHub dispatch timeout (retried, then consistent state) · dispatch retries exhausted → `failed` (`dispatch_failed`) · run never appears → `failed` (`run_not_found`) · lost webhook recovered by the reconcile sweep · invalid webhook signature · duplicate webhook delivery · out-of-order webhook event · invalid, expired or wrong-repository OIDC token · rejected approval · expired approval · stale approval (environment changed) · second decision by the same reviewer · self-approval blocked · a second active deployment in one environment returns 409 (from the index) · `Idempotency-Key` replay returns the same deployment · `UPDATE`/`DELETE` on `audit_logs` refused · unhealthy endpoint and threshold logic (one transient failure doesn't flip state) · verification timeout · SSRF-blocked health URL · rollback to an ineligible target · rollback workflow failure · AI provider unavailable (the deployment flow is unaffected) · prompt-injection fixture doesn't change the output schema.
 
 ## Conventions
 - Each test runs inside a transaction that is rolled back. Build data with factories (`factory_boy` or plain builders), not shared fixtures that change state.
 - **Never call real GitHub or AI APIs in tests or CI.** Mock GitHub with `respx` and use recorded fixtures. Use a fake `AIService` provider.
-- Use real Postgres (CI service container), not SQLite. Advisory locks, `SKIP LOCKED` and constraints must actually run.
+- Use real Postgres (CI service container), not SQLite. Partial unique indexes, triggers, `SKIP LOCKED` and constraints must actually run.
+- Test the worker by calling the job runner and sweeps directly (one iteration at a time) with a frozen clock; don't sleep in tests.
 - Name tests after the behavior: `test_reviewer_from_other_workspace_cannot_approve`.
 - To check UI behavior in a real browser during development, use the `webapp-testing` skill.

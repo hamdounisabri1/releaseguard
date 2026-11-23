@@ -55,46 +55,48 @@ gantt
     excludes    weekends
 
     section Setup
-    Sprint 0 - repos, GitHub App, tooling     :s0, 2026-11-22, 2026-11-24
+    Sprint 0 - repos, GitHub App, tooling, ADRs :s0, 2026-11-22, 2026-11-24
 
     section S1 Foundation
-    Backend skeleton, DB, auth, RBAC          :s1a, after s0, 4d
-    App & environment CRUD (API + UI)         :s1b, after s1a, 3d
-    Frontend shell, CI lint/test              :s1c, after s1b, 1d
-    M1 Sign in + configure app                :milestone, m1, 2026-12-04, 0d
+    Backend skeleton, DB, sessions, RBAC, CSRF :s1a, after s0, 4d
+    App & environment CRUD (API + UI)          :s1b, after s1a, 3d
+    Frontend shell, CI lint/test               :s1c, after s1b, 1d
+    M1 Sign in + configure app                 :milestone, m1, 2026-12-04, 0d
 
     section S2 Releases
-    TaskFlow repo + ci.yml + staging-deploy   :s2a, 2026-12-07, 3d
-    GitHub App webhooks + release registration :s2b, after s2a, 3d
-    Deployment records + state machine + UI   :s2c, after s2b, 4d
-    M2 Real CI run creates release            :milestone, m2, 2026-12-18, 0d
+    TaskFlow app + ci.yml (OIDC) + deploy.yml  :s2a, 2026-12-07, 3d
+    Worker, jobs table, GitHub App, dispatch   :s2b, after s2a, 3d
+    Webhooks, state machine, reconcile, UI     :s2c, after s2b, 4d
+    M2 Real CI run creates and deploys release :milestone, m2, 2026-12-18, 0d
 
     section S3 Approvals
-    Approval model, RBAC, policies            :s3a, 2026-12-21, 4d
-    Dispatch + production-deploy.yml          :s3b, after s3a, 3d
-    Approvals inbox + audit log UI            :s3c, after s3b, 3d
-    M3 Production gated by approval           :milestone, m3, 2027-01-01, 0d
+    Policy, approval service, expiry, stale    :s3a, 2026-12-21, 4d
+    Idempotency, cancel, prod protection       :s3b, after s3a, 2d
+    Approvals inbox, policy form, audit UI     :s3c, after s3b, 4d
+    M3 Production gated by approval            :milestone, m3, 2027-01-01, 0d
 
     section S4 Health & rollback
-    Worker + scheduled HTTP checks            :s4a, 2027-01-04, 4d
-    Rollback flow + rollback.yml              :s4b, after s4a, 4d
-    Env health UI + verification              :s4c, after s4b, 2d
-    M4 Unhealthy release rolled back          :milestone, m4, 2027-01-15, 0d
+    SSRF guard, scheduled checks, verification :s4a, 2027-01-04, 4d
+    Rollback service (same deploy.yml)         :s4b, after s4a, 3d
+    Env health UI, version comparison          :s4c, after s4b, 3d
+    M4 Unhealthy release rolled back           :milestone, m4, 2027-01-15, 0d
 
     section S5 AI
-    AIService + sanitizer + schema            :s5a, 2027-01-18, 4d
-    Failure analysis + release notes          :s5b, after s5a, 3d
-    AI analysis UI + fallback                 :s5c, after s5b, 3d
-    M5 Useful AI explanation                  :milestone, m5, 2027-01-29, 0d
+    AIService + sanitizer + schema             :s5a, 2027-01-18, 4d
+    Failure analysis + release notes jobs      :s5b, after s5a, 3d
+    AI analysis UI + fallback                  :s5c, after s5b, 3d
+    M5 Useful AI explanation                   :milestone, m5, 2027-01-29, 0d
 
     section S6 Delivery
-    Prod images, CI/CD, Trivy                 :s6a, 2027-02-01, 3d
-    VPS deploy, TLS, backups                  :s6b, after s6a, 3d
-    Playwright E2E, dashboard, docs, demo     :s6c, after s6b, 4d
-    M6 v1.0.0 live + repeatable demo          :milestone, m6, 2027-02-12, 0d
+    Prod images, CI/CD, Trivy                  :s6a, 2027-02-01, 3d
+    VPS deploy, Caddy same-origin, backups     :s6b, after s6a, 3d
+    Playwright E2E, dashboard, filters, demo   :s6c, after s6b, 4d
+    M6 v1.0.0 live + repeatable demo           :milestone, m6, 2027-02-12, 0d
 ```
 
 > **Holidays:** Sprint 3 (21 Dec – 1 Jan) covers Christmas and New Year, and its milestone falls on New Year's Day. If you take time off, move every later date by the same amount rather than squeezing scope. Use the [cut list](#6-buffer-risks-and-cut-list) if the end date is fixed.
+
+> **Design revision (23 Nov 2026):** the checklists below follow the reviewed architecture ([ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md), ADRs 0001–0007). The main changes: the worker and jobs table move to **S2** (staging dispatch needs them), TaskFlow has **one `deploy.yml`** (S4 needs no rollback workflow), approvals live on the deployment (no `approval_requests` or `rollback_events` tables), and releases register through **GitHub OIDC**.
 
 ---
 
@@ -103,12 +105,12 @@ gantt
 Each sprint has about **8.5 working days of planned work and 1.5 days of buffer**. Every sprint ends with a tagged release (`v0.N.0`), a 10-minute self-demo recording or notes, and a short retro note in `docs/retros/`.
 
 ### Sprint 0: Setup (Sun 22 – Mon 23 Nov 2026) · Epic SCRUM-5
-- [ ] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.5 of the guide](DEVELOPMENT_LIFECYCLE.md#55-repository-layout)) and a separate `taskflow` repo
+- [ ] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
 - [ ] SCRUM-7 Protect `main`, add PR template (draft in `.github/pull_request_template.md`), labels, and the Jira `SCRUM` board with the Sprint 0 Epic (the Epics, Tasks and board sprints for Sprints 1–6 are then created up front in one pass; see [§5](#5-work-tracking))
-- [ ] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read, Deployments: read/write; webhook events `workflow_run` and `workflow_job`)
+- [ ] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only)
 - [ ] SCRUM-9 Set up a webhook tunnel (smee.io or cloudflared)
 - [ ] SCRUM-10 `pre-commit` with Ruff, ESLint, Prettier and gitleaks; `.editorconfig`; `.env.example`
-- [ ] SCRUM-11 Write ADR-0001 (modular monolith) and ADR-0002 (deploy by digest)
+- [ ] SCRUM-11 Write ADR-0001 (modular monolith) and ADR-0002 (deploy by digest). *Drafted 23 Nov in [docs/adr/](adr/) together with ADRs 0003–0007 from the architecture review.*
 
 ---
 
@@ -116,11 +118,11 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 **Goal:** a user can sign in, create an application and configure its three environments.
 
 **Backend**
-- [ ] FastAPI app skeleton: `core/config.py` (pydantic-settings), `core/security.py`, `core/permissions.py`, the `api/v1` router layout, and a standard error shape
-- [ ] SQLAlchemy 2.0 models and the first Alembic migration: `users`, `workspaces`, `workspace_members`, `applications`, `environments`, `audit_logs`
-- [ ] Auth: argon2 password hashing, server-side sessions in Postgres, `HttpOnly` cookie, login, logout and `me` endpoints
+- [ ] FastAPI app skeleton: `core/config.py` (pydantic-settings), `core/security.py`, `core/permissions.py`, the `api/v1` router layout, a standard error shape, and the **Origin-check CSRF middleware** ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md))
+- [ ] SQLAlchemy 2.0 models and the first Alembic migration: `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments` (health fields + `policy` JSONB + health state), `audit_logs` with the **append-only trigger**; `workspace_id` and composite FKs on every tenant table
+- [ ] Auth: argon2id, server-side sessions (hashed id, idle and absolute timeout, rotate on login), `HttpOnly`/`Secure`/`SameSite=Lax` cookie, login, logout and `me`
 - [ ] RBAC dependency: `require_role(Role.ADMIN, …)` plus workspace scoping on every query
-- [ ] Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with each app)
+- [ ] Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
 - [ ] Audit log helper, `record_audit(actor, action, target, details)`, used by every state-changing service
 - [ ] `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
 - [ ] Seed script (1 workspace, 4 users, TaskFlow app)
@@ -130,51 +132,51 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 - [ ] API client in `services/`, types generated from OpenAPI (`openapi-typescript`), TanStack Query
 - [ ] Login page; auth guard; dashboard placeholder
 - [ ] Applications list (search, create, archive) and application details with environments tab
-- [ ] Environment settings form (health URL, expected status, interval, timeout, threshold)
+- [ ] Environment settings form (health URL, expected status, interval, timeout, threshold, verification rule)
 - [ ] Shared empty, loading, error and permission-denied components
 
 **DevOps**
 - [ ] `infra/docker-compose.yml` for local development (db, backend, frontend)
-- [ ] `ci.yml`: Ruff, mypy, pytest (Postgres service), ESLint, `tsc`, `next build`
+- [ ] `ci.yml`: Ruff, mypy, pytest (Postgres service), ESLint, `tsc`, `next build`, Alembic check
 
 **Tests**
-- [ ] Unit tests for permission rules; API tests for login, RBAC (allowed and denied) and **cross-workspace isolation**
+- [ ] Unit tests for permission rules; API tests for login, RBAC (allowed and denied), **cross-workspace isolation**, a state-changing request with a foreign `Origin` (403), and an `UPDATE` on `audit_logs` being refused
 
 **Definition of done:** a user signs in, creates TaskFlow and configures its three environments. A Viewer cannot edit. Another workspace's data cannot be reached. CI is green.
 
 ---
 
 ### Sprint 2: Releases and tracking (Mon 7 – Fri 18 Dec) → `v0.2.0`
-**Goal:** a real CI run in the TaskFlow repo creates a release, and its staging deployment is visible in ReleaseGuard.
+**Goal:** a real CI run in the TaskFlow repo registers a release, ReleaseGuard deploys it to dev automatically and to staging on request, and both deployments are tracked live.
 
 **TaskFlow (sample app repo)**
 - [ ] Minimal web app with `/health` (an env flag can force it to return HTTP 503, for the failure demo) and a Dockerfile
-- [ ] `ci.yml`: lint, test, Trivy, build, push to GHCR, capture **digest**, signed callback to ReleaseGuard
-- [ ] `staging-deploy.yml` (`workflow_dispatch`, inputs: `release_id`, `image_digest`, `environment`, `deployment_id`; `run-name: deploy-${{ inputs.deployment_id }}`)
-- [ ] Deploy target: TaskFlow containers on the VPS (or a free container host) over SSH, pulling by digest
+- [ ] `ci.yml`: lint, test, Trivy, build, push to GHCR, capture **digest**, register the release with an **OIDC token** (`id-token: write`, audience `GITHUB_OIDC_AUDIENCE`)
+- [ ] `deploy.yml` for **every** environment (`workflow_dispatch`; inputs `release_id`, `image_digest`, `environment`, `deployment_id`; `run-name: deploy-${{ inputs.deployment_id }}`; job `environment: ${{ inputs.environment }}`; pull by digest and check it)
+- [ ] Deploy target: TaskFlow Compose projects per environment on the VPS (or a free container host) over SSH, pulling by digest
 
-**Backend**
-- [ ] Migration: `releases`, `deployments`, `deployment_events`, `integrations`, `webhook_deliveries`
-- [ ] GitHub App service: JWT → installation token (cached), `httpx` with `tenacity` retries
-- [ ] `POST /github/webhooks`: **HMAC-SHA256 validation with constant-time compare**, delivery-ID idempotency, event routing
-- [ ] Release registration (`POST /releases` callback and from `workflow_run` events); unique `(application_id, version)`
-- [ ] `deployment_service` with the **state machine** (`ALLOWED_TRANSITIONS`, `transition()` that writes events and audit entries)
-- [ ] Staging deployment request → dispatch `staging-deploy.yml` → `workflow_run` webhook moves the deployment to Deploying, then Verifying/Failed (Verifying → Succeeded is a stub until S4)
+**Backend and worker**
+- [ ] Migration: `releases`, `deployments` (incl. the **partial unique index** on active statuses), `deployment_events` (append-only), `integrations`, `webhook_deliveries`, `jobs`
+- [ ] Worker: entrypoint and container, job runner (`FOR UPDATE SKIP LOCKED`, backoff, `dead` after `max_attempts`), sweep loop ([ADR-0004](adr/0004-postgres-jobs-table.md))
+- [ ] GitHub App service: JWT → installation token (cached), `httpx` + `tenacity`; **dispatch job** with `return_run_details`, storing run id and URL
+- [ ] `POST /github/webhooks`: **HMAC-SHA256 validation with constant-time compare** before parsing, delivery-ID idempotency, run matching (repo, workflow, `run-name`)
+- [ ] Release registration: `POST /releases/ci` (OIDC verification against JWKS, claim binding to repository id, workflow and SHA) and manual `POST /releases`; unique `(application_id, version)`
+- [ ] `deployment_service` with the **state machine** (`ALLOWED_TRANSITIONS`, `transition()` that writes events and audit entries and enqueues follow-up jobs); `current_deployment_id` set on entering Verifying
+- [ ] Auto-deploy on release (dev policy) and `POST /deployments` for staging; Verifying → Succeeded is immediate until verification lands in S4
+- [ ] Reconcile sweep: read stuck runs from the API; `run_not_found` after `DISPATCH_TIMEOUT_SECONDS`
 - [ ] GitHub integration connect and disconnect (installation callback, store `installation_id`)
 
 **Frontend**
-- [ ] Releases list and release details (version, SHA, digest, workflow link, deployments)
-- [ ] Deployment history with filters (app, env, status, actor, date)
-- [ ] Deployment details with **state timeline**
-- [ ] Environment version comparison on application details
+- [ ] Releases list and release details (version, SHA, digest, source, workflow link, deployments)
+- [ ] Deployment list (recent, per environment) and deployment details with **state timeline**; poll active deployments
 - [ ] Settings → GitHub integration page
 
 **Tests**
-- [ ] Unit: every allowed transition plus representative forbidden transitions
-- [ ] Integration: webhook with a valid signature, an invalid signature, a duplicate delivery and an out-of-order event
-- [ ] GitHub API mocked with `respx`; no real GitHub calls in CI
+- [ ] Unit: every allowed transition plus every forbidden pair
+- [ ] Integration: webhook with a valid signature, an invalid signature, a duplicate delivery and an out-of-order event; OIDC token valid, expired, wrong audience and wrong repository; dispatch timeout → retried → exhausted → Failed; reconcile → `run_not_found`; a second active deployment refused by the index (409)
+- [ ] GitHub API mocked with `respx`, OIDC with a local JWKS; no real GitHub calls in CI
 
-**Definition of done:** a push to TaskFlow creates a release with SHA and digest in ReleaseGuard. Requesting staging dispatches the workflow, and the status shows up live.
+**Definition of done:** a push to TaskFlow registers a release with SHA and digest, dev deploys automatically, requesting staging dispatches `deploy.yml`, and both statuses show up live.
 
 ---
 
@@ -182,31 +184,30 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 **Goal:** a production deployment **cannot** proceed without the required approval.
 
 **Backend**
-- [ ] Migration: `approval_requests`, `approval_decisions`; workspace setting `block_self_approval`, environment `approval_policy` (`required`, `min_reviewers`, `expires_after_hours`, `require_comment`)
+- [ ] Migration: `approval_decisions` (`UNIQUE (deployment_id, reviewer_id)`); workspace setting `block_self_approval`; environment policy validated by a Pydantic model (`requires_approval`, `min_approvals`, `approval_ttl_hours`, `require_comment`, `promote_from_environment_id`, `rollback_requires_approval`) and editable by Admins
 - [ ] `approval_service`:
-  - [ ] preconditions: release exists, image digest present, **successful staging deployment** of the same release
-  - [ ] create request → deployment goes to *Awaiting approval*
-  - [ ] decide: reviewer role, request still current and unexpired, no duplicate decision by the same reviewer, self-approval rule
-  - [ ] **one transaction:** record decision → transition to Approved → enqueue dispatch (outbox row)
+  - [ ] preconditions: release has a digest, a **Succeeded deployment in the `promote_from` environment**, requester role
+  - [ ] request → Awaiting approval with `policy_snapshot`, `approval_expires_at` and `base_deployment_id`
+  - [ ] decide: reviewer role, request unexpired and **not stale**, one decision per reviewer, self-approval rule, required comment
+  - [ ] **one transaction:** record decision → (if `min_approvals` reached) transition to Queued → insert dispatch job
   - [ ] rejection → Rejected, no dispatch
-  - [ ] expiry job → Expired
-- [ ] Production dispatch from the outbox, with retries. Store `workflow_run_id` and URL.
-- [ ] **Per-environment concurrency:** `pg_advisory_xact_lock` and a check for in-flight deployments (returns 409)
-- [ ] `Idempotency-Key` support on `POST /deployments`
-- [ ] Audit events: requested, approved, rejected, dispatched, started, finished
+- [ ] Expiry sweep → Expired
+- [ ] `Idempotency-Key` on `POST /deployments`; `POST /deployments/{id}/cancel` (Awaiting approval and Queued only)
+- [ ] Audit events: requested, approved, rejected, cancelled, expired, dispatched, finished
 
 **TaskFlow**
-- [ ] `production-deploy.yml` (`workflow_dispatch` only); checks that the digest matches the release; GitHub `production` environment protection as a second layer
+- [ ] GitHub `production` environment protection for `deploy.yml` (deployment-branch rule, required reviewers if the plan allows) as a second layer
 
 **Frontend**
-- [ ] "Request production deployment" with a confirmation dialog
-- [ ] **Approvals inbox:** pending list, release evidence (commit, digest, staging result), approve and reject with comment
+- [ ] "Request deployment" with a confirmation dialog for production, showing promotion evidence
+- [ ] **Approvals inbox:** pending list, release evidence (commit, digest, promotion result), approve and reject with comment
+- [ ] Environment policy form (Admin)
 - [ ] Approver identity and time on deployment details; audit log view
 
 **Tests**
-- [ ] Developer cannot approve; Reviewer from another workspace cannot approve; self-approval blocked when enabled
-- [ ] Expired and stale request rejected; double-approve is idempotent; concurrent production request returns 409
-- [ ] GitHub dispatch timeout → retried → deployment stays consistent
+- [ ] Developer cannot approve; Reviewer from another workspace gets 404; self-approval blocked when enabled
+- [ ] Expired and stale requests refused; a second decision by the same reviewer refused; approving while another deployment is active returns 409; `min_approvals = 2` needs two reviewers
+- [ ] Same `Idempotency-Key` returns the same deployment; cancel after dispatch returns 409
 
 **Definition of done:** as a Developer, request production → blocked until a Reviewer approves → the workflow is dispatched and the full audit trail is visible.
 
@@ -216,30 +217,30 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 **Goal:** a failed or unhealthy release can be replaced by an earlier known-good artifact.
 
 **Worker**
-- [ ] Worker process (same codebase, own entrypoint and container) with APScheduler and a Postgres job table (`FOR UPDATE SKIP LOCKED`)
-- [ ] Scheduled HTTP checks per environment (`httpx`, timeout, expected status); write `health_checks` rows
-- [ ] Post-deploy verification: on workflow success → Verifying → N checks → **Succeeded** or **Unhealthy** (consecutive-failure threshold)
-- [ ] Environment health state; failures linked to the deployment that last changed the environment
+- [ ] **SSRF guard** for health URLs (scheme allowlist, private-address block unless `HEALTH_CHECK_ALLOW_PRIVATE`, no redirects), checked on save and before every request
+- [ ] Scheduled checks via `environments.next_check_at`; write `health_checks` rows; update `health_status` and `consecutive_failures`
+- [ ] Verification job: `verify_successes` passes within `verify_timeout_seconds` → **Succeeded**; `failure_threshold` consecutive failures or the timeout → **Unhealthy**
+- [ ] Retention sweep (scheduled checks 14 days, `done` jobs 7 days)
 
 **Backend**
-- [ ] Migration: `rollback_events`
-- [ ] `rollback_service`: list candidates (earlier **Succeeded** releases with a digest), permission, eligibility, policy, concurrency checks, optional approval, new deployment `operation_type=rollback`, dispatch `rollback.yml`, link source → rollback → target
+- [ ] Migration: `health_checks`
+- [ ] `rollback_service`: candidates (releases that **succeeded in this environment**, with a digest, not current), permission, eligibility, `rollback_requires_approval`, new deployment `operation_type=rollback` with `rollback_of_deployment_id` and `reason`, dispatched through the same `deploy.yml`
+- [ ] `POST /environments/{id}/health/check-now` (enqueue)
 - [ ] Never change the original failed deployment
 
 **TaskFlow**
-- [ ] `rollback.yml` (redeploy the given digest)
 - [ ] A "bad" release that is ready to go: `/health` returns 503
 
 **Frontend**
-- [ ] Environment details: health badge, check history (table or sparkline), current release
+- [ ] Environment details: health badge, check history (table or sparkline), current release, **version comparison across environments**
 - [ ] Rollback dialog: current vs. target version, reason field, explicit confirmation
 - [ ] Deployment details: health checks tab; links between failed and rollback deployments
 - [ ] Keep **deployment status** and **environment health** visually distinct
 
 **Tests**
-- [ ] Threshold logic (a single transient failure doesn't flip state); unhealthy endpoint; rollback to an ineligible target rejected; rollback workflow failure; concurrent rollback returns 409
+- [ ] Threshold logic (a single transient failure doesn't flip state); verification timeout; SSRF-blocked URL; rollback to an ineligible target rejected; rollback workflow failure; concurrent rollback returns 409; retention keeps verification checks
 
-**Definition of done:** deploy the bad release to production → the environment turns Unhealthy → roll back to the earlier digest → health is restored. History shows both deployments.
+**Definition of done:** deploy the bad release to production → it ends Unhealthy and the environment turns unhealthy → roll back to the earlier digest → health is restored. History shows both deployments.
 
 ---
 
@@ -249,12 +250,12 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 **Backend and worker**
 - [ ] `AIService` interface plus one provider adapter (configured through `AI_PROVIDER`, `AI_MODEL`)
 - [ ] **Log sanitizer:** redact tokens, keys, passwords, connection strings, emails and private keys; cap the size; pick relevant excerpts (failed step and its surrounding lines)
-- [ ] Fetch failed job logs through the GitHub API (installation token, backend only)
+- [ ] Fetch failed job logs through the GitHub API (installation token, worker only)
 - [ ] Prompt that treats logs as **untrusted data** (delimited, with instructions not to follow embedded text)
 - [ ] Pydantic schema for the structured response; reject and store "unavailable" on invalid output
-- [ ] Migration: `ai_failure_reports` (+ `model_provider`, `analysis_version`)
+- [ ] Migration: `ai_failure_reports` (`status`, `model_provider`, `model_id`, `analysis_version`, evidence)
 - [ ] `analyze_deployment_failure`, `summarize_pipeline_logs`, `generate_release_notes`; `compare_deployment_failures` (**stretch**)
-- [ ] Runs as an async worker job; a deployment never waits on AI
+- [ ] Runs as `ai_analysis` / `ai_release_notes` jobs, auto-enqueued on Failed or Unhealthy; a deployment never waits on AI
 - [ ] Authorization: users see analysis only for deployments in their workspace
 
 **Frontend**
@@ -275,20 +276,21 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 **DevOps**
 - [ ] Multi-stage production Dockerfiles (backend, worker, frontend `output: standalone`), non-root users
-- [ ] Production `docker-compose.yml`: proxy (Caddy, automatic TLS), frontend, backend, worker, db (named volume, not exposed publicly)
+- [ ] Production `docker-compose.yml`: proxy (Caddy, automatic TLS, `/` → frontend and `/api` → backend on **one origin**), frontend, backend, worker, db (named volume, not exposed publicly)
 - [ ] `release.yml`: build → **Trivy (fail on HIGH/CRITICAL)** → push to GHCR → SSH deploy (`compose pull`, `alembic upgrade head`, `up -d`) → smoke test `/healthz`
 - [ ] Production GitHub App registration and secrets on the VPS (`chmod 600` env file)
 - [ ] `infra/scripts/backup.sh` (nightly `pg_dump`, retention, off-host copy) and `restore.sh`. **Run one restore test.**
 - [ ] Optional: Prometheus `/metrics` and a Grafana dashboard
 
 **Product polish**
-- [ ] Dashboard: summary cards, env × app matrix, recent activity, pending approvals, failed deployments, success rate over a date range
+- [ ] Dashboard: summary cards, env × app matrix, recent activity, pending approvals, failed deployments, dead jobs, success rate over a date range
+- [ ] Deployment history filters (app, env, status, actor, date)
 - [ ] Consistent status vocabulary and colors; empty, loading, error and permission-denied states everywhere
 - [ ] UTC storage and local-time rendering checked
 
 **Quality**
 - [ ] Playwright E2E: login → request → approve → status updates → rollback UI
-- [ ] Failure-path test sweep (GitHub timeout, duplicate webhook, rejected approval, unhealthy endpoint, rollback failure)
+- [ ] Failure-path test sweep (GitHub timeout, lost webhook, duplicate webhook, rejected approval, unhealthy endpoint, rollback failure)
 - [ ] Coverage report; Trivy report (secrets removed)
 
 **Documentation and portfolio**
@@ -349,7 +351,8 @@ About 1.5 days per sprint (~15%). Unused buffer goes to tests and docs, **not** 
 ### Top delivery risks
 | Risk | Early signal | Response |
 |---|---|---|
-| GitHub App and webhook setup takes longer than planned | S2 day 4 with no release registered | Temporarily use the authenticated callback from `ci.yml` only; add `workflow_run` webhooks later in S2 or S3 |
+| GitHub App and webhook setup takes longer than planned | S2 day 4 with no release registered | Release registration (OIDC) doesn't depend on webhooks; until webhooks work, the reconcile sweep reads run status from the API |
+| S2 is the heaviest sprint (worker, GitHub App, OIDC, webhooks, state machine) | S2 day 5 with no run dispatched | Move manual `POST /releases` and the GitHub integration settings page to S3; keep the dispatch → webhook → timeline path |
 | Deploy target for TaskFlow is unclear | S2 day 2 | Use the same VPS with separate compose projects per environment (`taskflow-dev/staging/prod`) |
 | Holiday weeks (S3) | Before 21 Dec (S3 start) | Move dates; don't compress approval-engine work |
 | AI output quality is poor | S5 day 5 | Narrow the input to the failed step's excerpt; add few-shot examples; keep the schema strict |
@@ -362,8 +365,9 @@ About 1.5 days per sprint (~15%). Unused buffer goes to tests and docs, **not** 
 4. Minimum-reviewer-count policy (keep single approval and the self-approval rule)
 5. AI release notes (keep failure analysis)
 6. Rollback approval policy (keep manual rollback with confirmation and reason)
+7. Manual release registration (keep OIDC registration from CI)
 
-**Never cut:** real GitHub Actions integration, digest-based deployment, backend RBAC and workspace isolation, the approval gate, health verification, manual rollback, the audit trail, webhook signature validation, backups.
+**Never cut:** real GitHub Actions integration, digest-based deployment, backend RBAC and workspace isolation, the approval gate, the single-active-deployment constraint, health verification, manual rollback, the audit trail, webhook signature validation, OIDC release verification, the reconcile and expiry sweeps, the SSRF guard, backups.
 
 ---
 

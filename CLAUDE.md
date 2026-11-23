@@ -8,7 +8,7 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 
 - **Status:** pre-code. Only the docs exist so far. **Current sprint: 0, Setup (22–23 Nov 2026), Epic SCRUM-5 (Tasks SCRUM-6…11), started 23 Nov; Sprint 1 starts 24 Nov.** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
 - **Source of truth:** [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) covers architecture, data model, state machine, API, security and process. The original spec is [docs/ReleaseGuard_Project_Specification.pdf](docs/ReleaseGuard_Project_Specification.pdf).
-- **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` (a separate, small sample app whose `ci.yml`, `staging-deploy.yml`, `production-deploy.yml` and `rollback.yml` workflows ReleaseGuard triggers and monitors). The demo depends on both.
+- **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` (a separate, small sample app with two workflows: `ci.yml`, which registers each release through GitHub OIDC, and `deploy.yml`, which ReleaseGuard dispatches for every environment and for rollback). The demo depends on both.
 - **Team:** one full-stack developer. Prefer vertical slices that can be demoed at the end of each sprint over horizontal layers.
 - **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and its PR is squash-merged (Git rhythm: commit per green step, push at session end, one PR per Task; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
 
@@ -25,6 +25,7 @@ docker compose -f infra/docker-compose.yml up --build        # everything
 cd backend && uv sync
 uv run alembic upgrade head && uv run python -m app.scripts.seed   # migrate + seed (1 workspace, 4 users, TaskFlow)
 uv run uvicorn app.main:app --reload                               # http://localhost:8000/docs
+uv run python -m app.worker                                        # worker: job loop + sweeps (second terminal)
 uv run pytest                                                      # all tests (needs Postgres)
 uv run pytest tests/path/test_file.py::test_name                   # single test
 uv run ruff check . && uv run ruff format --check . && uv run mypy app   # lint + types
@@ -41,16 +42,18 @@ CI gates that block a merge: Ruff, mypy, ESLint, `tsc`, pytest, Vitest/Playwrigh
 
 ## Architecture (big picture)
 
-A **modular monolith**: one Next.js app, one FastAPI backend, one PostgreSQL database, and one worker process that shares the backend code. There's no Redis or message broker in v1.
+A **modular monolith**: one Next.js app, one FastAPI backend, one PostgreSQL database, and one worker process that shares the backend code. There's no Redis or message broker in v1. The design was reviewed on 23 Nov 2026: see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) and ADRs [0001–0007](docs/adr/).
 
-- **Layering:** route (thin, Pydantic in and out) → **service** (permissions, rules, transitions, transactions, integration calls) → repository (data access only) → DB.
-- **Deployment status is a state machine** owned by `deployment_service` alone: `ALLOWED_TRANSITIONS` plus `transition()`, which writes a `deployment_events` row and an audit entry. No other code sets `status`. The states are in guide §8.
-- **Release ≠ deployment.** A release is an immutable build, identified by its **image digest**. A deployment is one attempt to put a release into one environment. A rollback is a **new** deployment (`operation_type=rollback`) linked to the failed one. History is never rewritten.
-- **Approval gate:** recording the decision, the transition to Approved and the outbox row that dispatches the workflow all happen in **one transaction**. The worker dispatches from the outbox with retries. A per-environment `pg_advisory_xact_lock` blocks concurrent deployments (409).
-- **GitHub integration:** through a GitHub App (JWT → installation token). ReleaseGuard sends `workflow_dispatch` with inputs `release_id`, `image_digest`, `environment` and `deployment_id`. Each run is matched back by `run-name: deploy-<deployment_id>`. Status comes back through `workflow_run` webhooks (details in `security.md`).
-- **Worker:** APScheduler plus a Postgres job table (`FOR UPDATE SKIP LOCKED`). It runs health checks, post-deploy verification, dispatch retries and AI jobs.
-- **AI** is isolated behind `AIService`, runs only as async worker jobs, and is **read-only**. It never approves, dispatches or rolls back. A deployment never waits on AI.
-- **Tenancy:** every query is scoped to the caller's workspace (404 for another workspace; see `security.md`).
+- **Layering:** route (thin, Pydantic in and out) → **service** (permissions, rules, transitions, transactions) → repository (data access only) → DB. **The API process never calls GitHub, the LLM or health URLs.** It writes state plus a job in one transaction; the worker does all outbound I/O.
+- **Deployment status is a state machine** owned by `deployment_service` alone: `ALLOWED_TRANSITIONS` plus `transition()`, which writes a `deployment_events` row and an audit entry and enqueues the follow-up job. No other code sets `status`. States: `awaiting_approval`, `queued`, `deploying`, `verifying` (active), then `succeeded`, `failed`, `unhealthy`, `rejected`, `expired`, `cancelled` (terminal). Every non-terminal state has an owner and a timeout (guide §8).
+- **Release ≠ deployment.** A release is an immutable build, identified by its **image digest**. A deployment is one attempt to put a release into one environment. Approval decisions, the frozen policy and the rollback link (`rollback_of_deployment_id`) live **on the deployment**. A rollback is a **new** deployment (`operation_type=rollback`). History is never rewritten; `audit_logs` and `deployment_events` are append-only.
+- **One active deployment per environment**, enforced by a partial unique index on `deployments(environment_id)` for `queued/deploying/verifying` (violation → 409). No advisory locks.
+- **Approval gate:** inserting the decision, moving to `queued` and inserting the dispatch job happen in **one transaction**. Requests are refused when expired, stale (the environment changed since the request) or self-approved under `block_self_approval`.
+- **GitHub integration:** a GitHub App (Actions RW, Contents R, Metadata R; `workflow_run` events only). The worker dispatches `deploy.yml` with exactly `release_id`, `image_digest`, `environment`, `deployment_id` and `return_run_details`, then stores the run id. Webhook events are matched by repo, workflow and `run-name: deploy-<deployment_id>`. A reconcile sweep recovers lost webhooks. CI registers releases at `POST /releases/ci` with a **GitHub OIDC token** bound to the repository id, workflow and SHA.
+- **Worker:** one async loop over a Postgres `jobs` table (`FOR UPDATE SKIP LOCKED`), which is also the outbox, plus sweeps for approval expiry, run reconciliation, due health checks and retention. No APScheduler.
+- **AI** is isolated behind `AIService`, runs only as worker jobs, and is **read-only**. It never approves, dispatches or rolls back. A deployment never waits on AI.
+- **Tenancy:** every tenant table has `workspace_id` (with composite FKs), and every query is scoped to the caller's workspace (404 for another workspace; see `security.md`).
+- **Browser security:** one origin through Caddy (`/` and `/api`), server-side sessions, `SameSite=Lax`, and an Origin check on unsafe methods. Health URLs go through an SSRF guard.
 
 ## Rules folder: `.claude/rules/`
 
@@ -98,6 +101,7 @@ The project-scoped tooling is listed in [docs/AI_TOOLING.md](docs/AI_TOOLING.md)
 | Writing or changing a Dockerfile | `multi-stage-dockerfile` skill |
 | Reading, creating or updating Jira tickets | `jira` MCP server (`mcp-atlassian`, tools `jira_*`); the `jira-integration` skill is background reference only |
 | Planning all sprints up front: turning the `PROJECT_PLAN.md` checklists into Jira Tasks | `/to-tickets` skill (Jira configuration in `jira-workflow.md` §3) |
+| Designing a new component, API, data model or service boundary, or weighing options for a technical decision | `system-design` and `architecture` skills (they inform; `DEVELOPMENT_LIFECYCLE.md` stays the source of truth). Record the decision with `/new-adr` |
 | Writing code against a library API (Next.js, FastAPI, SQLAlchemy, Alembic, Pydantic, TanStack Query, shadcn/ui, GitHub REST) | `context7` (look up current docs) |
 | Working with PRs, repos or Actions runs | `github` plugin / `gh` CLI |
 | Committing, pushing, opening a PR | `commit-commands` (`/commit`, `/commit-push-pr`) |

@@ -9,19 +9,24 @@ ReleaseGuard has authority over production releases. These rules apply to all co
 - Self-approval is blocked when the workspace setting `block_self_approval` is on. A reviewer can't decide twice on the same request. Stale or expired requests can't be decided.
 
 ## Authentication and sessions
-- Hash passwords with argon2. Sessions are server-side in Postgres, sent as an `HttpOnly`, `Secure`, `SameSite` cookie. No JWT in `localStorage`.
+- Hash passwords with argon2id. Sessions are server-side in Postgres (the cookie holds a random id; the table stores its hash; idle 12 h, absolute 7 days, rotated on login), sent as an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. No JWT in `localStorage` (ADR-0007).
+- **CSRF:** the browser uses one origin (Caddy serves `/` and `/api`). Every unsafe method (`POST/PUT/PATCH/DELETE`) must carry an `Origin` (or `Referer`) equal to `SITE_ORIGIN`, otherwise 403. Only `POST /github/webhooks` (HMAC) and `POST /releases/ci` (OIDC) are exempt, because they don't use cookies.
 - Session secrets, GitHub App private key, webhook secret and AI key are **backend/worker only**. Never prefix them `NEXT_PUBLIC_*`. The only public variable is `NEXT_PUBLIC_API_BASE_URL`.
 
 ## GitHub and webhooks
 - Validate `X-Hub-Signature-256` with HMAC-SHA256 and `hmac.compare_digest` **before** parsing the body. Reject a missing or invalid signature with 401.
 - De-duplicate by `X-GitHub-Delivery` (`webhook_deliveries.delivery_id` unique). A duplicate returns 200 and does nothing.
 - Use short-lived installation tokens, cached and refreshed before they expire. Never use personal access tokens in app code.
-- Request only the GitHub App permissions the workflows need (Actions RW, Contents R, Metadata R, Deployments RW).
+- Request only the GitHub App permissions the workflows need: Actions RW, Contents R, Metadata R. Subscribe to `workflow_run` only.
+- **CI release registration** uses GitHub Actions OIDC, not a shared secret. Verify the JWT signature against GitHub's JWKS plus `iss`, `aud` (`GITHUB_OIDC_AUDIENCE`) and `exp`, then require `repository_id` = the application's repository id, `workflow_ref` = its CI workflow on the default branch or a tag, and `sha` = the body's commit SHA. Any mismatch → 401/403 and nothing is written (ADR-0006).
 
 ## Deployment safety
 - Never run shell commands to deploy. The backend only sends `workflow_dispatch` with the fixed inputs `release_id`, `image_digest`, `environment` and `deployment_id`. User input and AI output must never become commands, repositories, refs or targets.
 - Deploy by **digest** (`sha256:…`), never by a mutable tag. Workflows check that the digest matches the approved release.
 - Check that each incoming workflow run matches the deployment's expected repo, workflow and `run-name`.
+- At most one active deployment per environment: rely on the partial unique index, never on application-level checks alone.
+- **SSRF guard for health URLs:** `http`/`https` only; resolve the host and refuse private, loopback, link-local and multicast addresses (unless `HEALTH_CHECK_ALLOW_PRIVATE=true`, local dev only); no redirects; cap the response size; validate on save **and** before every request.
+- `audit_logs` and `deployment_events` are append-only (DB trigger). Never write code that updates or deletes them.
 
 ## Data handling
 - Logs never contain secrets, tokens, cookies or full webhook payloads. Redact before logging.
