@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ReleaseGuard is a **deployment approval and rollback manager** for small teams. It is **not** a CI/CD engine. GitHub Actions builds and deploys. ReleaseGuard decides whether a release may proceed, records every decision, dispatches approved workflows, verifies health over HTTP and coordinates rollback to an earlier image **digest**.
 
-- **Status:** pre-code. Only the docs exist so far. **Current sprint: 0, Setup (22–23 Nov 2026); Sprint 1 starts 24 Nov.** Update this line when a sprint starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
+- **Status:** pre-code. Only the docs exist so far. **Current sprint: 0, Setup (22–23 Nov 2026), Epic SCRUM-5 (Tasks SCRUM-6…11), started 23 Nov; Sprint 1 starts 24 Nov.** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
 - **Source of truth:** [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) covers architecture, data model, state machine, API, security and process. The original spec is [docs/ReleaseGuard_Project_Specification.pdf](docs/ReleaseGuard_Project_Specification.pdf).
 - **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` (a separate, small sample app whose `ci.yml`, `staging-deploy.yml`, `production-deploy.yml` and `rollback.yml` workflows ReleaseGuard triggers and monitors). The demo depends on both.
 - **Team:** one full-stack developer. Prefer vertical slices that can be demoed at the end of each sprint over horizontal layers.
-- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **A sprint starts only after its Epic and Tasks exist in Jira, covering only that sprint's known tasks** (never pre-create future sprints). Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) when planning a sprint, starting or finishing a ticket, or filing a bug. `/sprint-status` shows the board.
+- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and its PR is squash-merged (Git rhythm: commit per green step, push at session end, one PR per Task; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
 
 ## Commands
 
@@ -63,7 +63,7 @@ Detailed rules live in their own files so this file stays short. Files with a `p
 | [maintenance.md](.claude/rules/maintenance.md) | Committing new tools, keeping `.md` files current, regression tests and lessons | Always |
 | [security.md](.claude/rules/security.md) | Auth, RBAC, secrets, webhooks, deployment safety | Always |
 | [git-workflow.md](.claude/rules/git-workflow.md) | Branches, commits, PRs, Definition of Done, ADRs | Always |
-| [jira-workflow.md](.claude/rules/jira-workflow.md) | Claude as project manager: sprint Epics, tickets, bugs, sprint end | `docs/PROJECT_PLAN.md`, `docs/retros/**`, or read explicitly |
+| [jira-workflow.md](.claude/rules/jira-workflow.md) | Claude as project manager: up-front sprint planning, daily plan, tickets, auto-Done, bugs, sprint end | `docs/PROJECT_PLAN.md`, `docs/retros/**`, or read explicitly |
 | [backend.md](.claude/rules/backend.md) | FastAPI layering, services, transactions, state machine, API conventions, worker | `backend/**`, `worker/**` |
 | [database.md](.claude/rules/database.md) | SQLAlchemy models, Alembic migrations, constraints | models, repositories, migrations |
 | [frontend.md](.claude/rules/frontend.md) | Next.js, data fetching, UI states, status vocabulary | `frontend/**` |
@@ -97,7 +97,7 @@ The project-scoped tooling is listed in [docs/AI_TOOLING.md](docs/AI_TOOLING.md)
 | Writing or reviewing any `.github/workflows/*.yml` | `github-actions-hardening` skill |
 | Writing or changing a Dockerfile | `multi-stage-dockerfile` skill |
 | Reading, creating or updating Jira tickets | `jira` MCP server (`mcp-atlassian`, tools `jira_*`); the `jira-integration` skill is background reference only |
-| Starting a sprint: turning its `PROJECT_PLAN.md` checklist into Jira Tasks | `/to-tickets` skill (Jira configuration in `jira-workflow.md` §3) |
+| Planning all sprints up front: turning the `PROJECT_PLAN.md` checklists into Jira Tasks | `/to-tickets` skill (Jira configuration in `jira-workflow.md` §3) |
 | Writing code against a library API (Next.js, FastAPI, SQLAlchemy, Alembic, Pydantic, TanStack Query, shadcn/ui, GitHub REST) | `context7` (look up current docs) |
 | Working with PRs, repos or Actions runs | `github` plugin / `gh` CLI |
 | Committing, pushing, opening a PR | `commit-commands` (`/commit`, `/commit-push-pr`) |

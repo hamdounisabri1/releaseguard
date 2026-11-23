@@ -51,7 +51,7 @@ All plugins come from the official marketplace, `claude-plugins-official`.
 | **github-actions-hardening** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Security review of the `ci.yml` and deploy/rollback workflows: injection, token permissions, SHA pinning |
 | **jira-integration** | [affaan-m/ECC](https://github.com/affaan-m/ECC) | MIT | Background reference for Jira concepts (JQL, transitions). Use the **jira** MCP server for actual calls (note: its setup example passes `JIRA_EMAIL`, but `mcp-atlassian` needs `JIRA_USERNAME`; `.mcp.json` maps it): the skill's REST examples need `jq` and use the retired `/rest/api/3/search` endpoint |
 | **multi-stage-dockerfile** | [github/awesome-copilot](https://github.com/github/awesome-copilot) | MIT | Small, safe multi-stage Dockerfiles for the backend, worker and frontend images |
-| **to-tickets** | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-tickets) | MIT | `/to-tickets` (user-invoked only): at sprint start, drafts the sprint's checklist as vertical-slice Jira Tasks with blocking links, then creates them under the sprint Epic after approval. Its Jira configuration is in `jira-workflow.md` §3 |
+| **to-tickets** | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-tickets) | MIT | `/to-tickets` (user-invoked only): in the one-time up-front planning pass, drafts every sprint's checklist as vertical-slice Jira Tasks with blocking links, then creates them under each sprint's Epic after approval. Its Jira configuration is in `jira-workflow.md` §3 |
 
 Built-in skills the rules also reference (shipped with Claude Code, nothing to install): **`claude-api`** for AI provider code (`ai.md`).
 
