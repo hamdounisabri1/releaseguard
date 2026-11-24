@@ -5,7 +5,7 @@ Next.js · FastAPI · PostgreSQL · Docker · GitHub Actions · AI-assisted fail
 
 ReleaseGuard is not a CI/CD engine. GitHub Actions builds and deploys. ReleaseGuard decides whether a release may proceed, records every approval, triggers the approved workflows, verifies health and coordinates rollback to a known-good image digest.
 
-> 🚧 **Status: pre-code.** The design, plan and tooling are in place. Application code starts in Sprint 1. Target MVP `v1.0.0`: 12 Feb 2027.
+> 🚧 **Status: pre-code.** The design, plan and tooling are in place. The monorepo layout exists as placeholders; application code starts in Sprint 1. Target MVP `v1.0.0`: 19 Feb 2027.
 
 ## How it works
 
@@ -19,13 +19,13 @@ ReleaseGuard is not a CI/CD engine. GitHub Actions builds and deploys. ReleaseGu
 
 | Sprint | Dates | Goal | Release |
 |---|---|---|---|
-| 0 Setup | 22–23 Nov 2026 | Repos, GitHub App, tooling, ADRs | none |
-| 1 Foundation | 24 Nov – 4 Dec | Auth, RBAC, applications and environments, CI | `v0.1.0` |
-| 2 Releases and tracking | 7 – 18 Dec | GitHub integration, OIDC releases, worker, webhooks, dev and staging deployments | `v0.2.0` |
-| 3 Approval engine | 21 Dec – 1 Jan | Approval gate, production dispatch, concurrency | `v0.3.0` |
-| 4 Health and rollback | 4 – 15 Jan | Verification, health checks, rollback | `v0.4.0` |
-| 5 AI assistant | 18 – 29 Jan | Sanitized failure analysis | `v0.5.0` |
-| 6 Delivery and polish | 1 – 12 Feb 2027 | Production Docker setup, E2E tests, demo | `v1.0.0` |
+| 0 Setup | 22–25 Nov 2026 | Repos, GitHub App, tooling, ADRs | none |
+| 1 Foundation | 26 Nov – 11 Dec | Auth, RBAC, applications and environments, CI | `v0.1.0` |
+| 2 Releases and tracking | 14 – 25 Dec | GitHub integration, OIDC releases, worker, webhooks, dev and staging deployments | `v0.2.0` |
+| 3 Approval engine | 28 Dec – 8 Jan | Approval gate, production dispatch, concurrency | `v0.3.0` |
+| 4 Health and rollback | 11 – 22 Jan | Verification, health checks, rollback | `v0.4.0` |
+| 5 AI assistant | 25 Jan – 5 Feb | Sanitized failure analysis | `v0.5.0` |
+| 6 Delivery and polish | 8 – 19 Feb 2027 | Production Docker setup, E2E tests, demo | `v1.0.0` |
 
 The full checklist is in the [project plan](docs/PROJECT_PLAN.md). Work is tracked in the Jira project `SCRUM`.
 
@@ -44,6 +44,10 @@ The full checklist is in the [project plan](docs/PROJECT_PLAN.md). Work is track
 ## Repository layout
 
 ```text
+backend/        FastAPI API + shared worker code (Sprint 1)
+frontend/       Next.js web UI (Sprint 1)
+worker/         Worker entrypoint and container (Sprint 2)
+infra/          Docker Compose, Caddy reverse proxy, backup/restore scripts
 .claude/        Claude Code config: rules, skills, hooks, agents, commands
 .github/        PR template (workflows arrive in Sprint 1)
 docs/           Lifecycle guide, project plan, architecture review, ADRs, AI tooling, spec
@@ -52,7 +56,7 @@ CLAUDE.md       Instructions for Claude Code
 .mcp.json       Project MCP servers (Jira)
 ```
 
-`backend/` (FastAPI, plus the worker entrypoint), `frontend/` (Next.js) and `infra/` (Docker Compose) are added in Sprint 1. The sample app **TaskFlow** lives in a separate repository.
+`backend/`, `frontend/`, `worker/` and `infra/` hold README placeholders that describe their planned layout ([guide §5.6](docs/DEVELOPMENT_LIFECYCLE.md#56-repository-layout)). The sample app **TaskFlow** lives in a separate repository: [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow).
 
 ## Getting started
 
