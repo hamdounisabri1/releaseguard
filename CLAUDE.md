@@ -34,6 +34,10 @@ uv run alembic upgrade head && uv run alembic check                # migration g
 # Frontend (Node LTS, pnpm: not installed yet, `corepack enable` or `npm i -g pnpm`)
 cd frontend && pnpm install && pnpm dev                       # http://localhost:3000
 pnpm eslint . && pnpm tsc --noEmit && pnpm build
+
+# GitHub repo settings (ruleset protect-main, squash-only, labels); idempotent, needs gh as repo admin
+infra/github/setup-repo.sh hamdounisabri1/releaseguard
+infra/github/setup-repo.sh hamdounisabri1/taskflow
 ```
 
 **Windows dev machine:** both PowerShell 7 and Git Bash work; use the syntax of the shell you're in. If `python` opens the Microsoft Store stub, use `py -3`. `jq` isn't installed; parse JSON with Python.

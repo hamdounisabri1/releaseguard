@@ -1017,7 +1017,7 @@ flowchart LR
 The team works in **vertical slices**. Each sprint ends with something working that can be demoed, not a pile of models or screens. See [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ### 14.2 Branching, commits and versioning
-- **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required).
+- **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required). Both repos use the ruleset `protect-main` (PR required, squash-merge only, no force-push or deletion, no bypass), applied by [`infra/github/setup-repo.sh`](../infra/README.md#github-repository-settings). Required status checks are added in Sprint 1, once CI exists.
 - Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge within 1–2 days.
 - **Conventional Commits:** `feat(api): block self-approval when policy enabled`. Scopes: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra`, `docs`.
 - **Squash-merge** PRs so `main` has one commit per change.
