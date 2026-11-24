@@ -419,7 +419,7 @@ releaseguard/
 └── README.md
 ```
 
-The TaskFlow sample app lives in a **separate repository** with two workflows, `ci.yml` and `deploy.yml` (see [section 10](#10-github-actions-integration)).
+The TaskFlow sample app lives in a **separate repository**, [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow), with two workflows, `ci.yml` and `deploy.yml` (see [section 10](#10-github-actions-integration)).
 
 ---
 
