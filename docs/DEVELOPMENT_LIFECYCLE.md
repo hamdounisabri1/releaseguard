@@ -850,7 +850,7 @@ sequenceDiagram
 - **Permissions:** Actions read/write (dispatch, runs, logs), Contents read, Metadata read. Nothing else.
 - **Webhook events:** `workflow_run` only.
 - Short-lived installation tokens, cached and refreshed before expiry, used only in the worker.
-- A separate development App (webhooks through a smee.io or cloudflared tunnel) and a production App.
+- A separate development App (webhooks through a smee.io or cloudflared tunnel) and a production App. Registration steps, verification and key rotation: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md).
 
 ### 10.5 Defense in depth
 Configure **GitHub environment protection rules** on the `production` environment (required reviewers where the plan allows, and a deployment-branch rule). ReleaseGuard still enforces its own policy, so the product logic never depends on GitHub plan features.
@@ -1074,7 +1074,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 **Seed data:** one workspace, four users (one per role), the TaskFlow application with three environments, and some example releases and deployments, so every screen has content.
 
-**Testing GitHub webhooks locally:** use a tunnel (`smee.io`, `ngrok` or `cloudflared`) pointing at `/api/v1/github/webhooks`, with a **separate development GitHub App**.
+**Testing GitHub webhooks locally:** use a tunnel (`smee.io`, `ngrok` or `cloudflared`) pointing at `/api/v1/github/webhooks`, with a **separate development GitHub App** ([setup](GITHUB_APP_SETUP.md)).
 
 **Key environment variables (`.env.example`):**
 
@@ -1082,7 +1082,7 @@ docker compose -f infra/docker-compose.yml up --build
 |---|---|---|
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…` |
 | `SESSION_SECRET` | backend | Random 32+ bytes |
-| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*` |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
 | `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
 | `DISPATCH_TIMEOUT_SECONDS` | worker | How long a deployment may wait for its GitHub run before `run_not_found` (default 600) |

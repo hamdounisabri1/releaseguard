@@ -109,7 +109,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 ### Sprint 0: Setup (Sun 22 – Wed 25 Nov 2026, extended) · Epic SCRUM-5
 - [x] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
 - [ ] SCRUM-7 Protect `main`, add PR template (draft in `.github/pull_request_template.md`), labels, and the Jira `SCRUM` board with the Sprint 0 Epic (the Epics, Tasks and board sprints for Sprints 1–6 are then created up front in one pass; see [§5](#5-work-tracking))
-- [ ] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only)
+- [x] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only). Steps: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)
 - [ ] SCRUM-9 Set up a webhook tunnel (smee.io or cloudflared)
 - [ ] SCRUM-10 `pre-commit` with Ruff, ESLint, Prettier and gitleaks; `.editorconfig`; `.env.example`
 - [ ] SCRUM-11 Write ADR-0001 (modular monolith) and ADR-0002 (deploy by digest). *Drafted 23 Nov in [docs/adr/](adr/) together with ADRs 0003–0007 from the architecture review.*

@@ -37,6 +37,7 @@ The full checklist is in the [project plan](docs/PROJECT_PLAN.md). Work is track
 | [Project plan](docs/PROJECT_PLAN.md) | 6 sprints, milestones, cut list, MVP acceptance checklist |
 | [Architecture review](docs/ARCHITECTURE_REVIEW.md) + [ADRs](docs/adr/) | Design review of 23 Nov 2026 and the decisions it produced |
 | [Project specification (PDF)](docs/ReleaseGuard_Project_Specification.pdf) | The original spec |
+| [GitHub App setup](docs/GITHUB_APP_SETUP.md) | Registering the development and production GitHub Apps, verifying them, rotating keys |
 | [AI tooling](docs/AI_TOOLING.md) | Claude Code plugins, skills and MCP servers used here, and how to set them up |
 | [CLAUDE.md](CLAUDE.md) + [.claude/rules/](.claude/rules/) | Project instructions and rules for Claude Code (security, backend, frontend, database, testing, CI, infra, AI) |
 | [Pull request template](.github/pull_request_template.md) | What every PR must cover |
