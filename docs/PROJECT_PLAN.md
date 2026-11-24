@@ -112,7 +112,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 - [x] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only). Steps: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)
 - [ ] SCRUM-9 Set up a webhook tunnel (smee.io or cloudflared)
 - [ ] SCRUM-10 `pre-commit` with Ruff, ESLint, Prettier and gitleaks; `.editorconfig`; `.env.example`
-- [ ] SCRUM-11 Write ADR-0001 (modular monolith) and ADR-0002 (deploy by digest). *Drafted 23 Nov in [docs/adr/](adr/) together with ADRs 0003–0007 from the architecture review.*
+- [x] SCRUM-11 Write ADR-0001 (modular monolith) and ADR-0002 (deploy by digest). *Drafted 23 Nov in [docs/adr/](adr/) together with ADRs 0003–0007 from the architecture review; final review 24 Nov.*
 
 ---
 
@@ -319,12 +319,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Tue 24 Nov 2026
-- **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1) · SCRUM-8 Development GitHub App (PR #2) · SCRUM-7 Protect main on both repos, PR template, labels (PR #3)
-- **Today's Tasks:** SCRUM-11 ADR-0001 and ADR-0002 (0.25d; drafted 23 Nov, needs final review)
+- **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1) · SCRUM-8 Development GitHub App (PR #2) · SCRUM-7 Protect main on both repos, PR template, labels (PR #3) · SCRUM-11 ADR-0001 and ADR-0002
+- **Today's Tasks:** SCRUM-9 webhook tunnel (0.25d) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example` (0.5d), both pulled forward from Wed 25 Nov
 - **Carried over:** none
-- **Blocked:** none (SCRUM-9 unblocked by SCRUM-8)
-- **Next (Wed 25 Nov):** SCRUM-9 webhook tunnel (0.25d) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example` (0.5d)
-- **Schedule:** Sprint 0 was extended to Wed 25 Nov. 1.75d of work is left for about 1.5 days: tight but on track. SCRUM-10 is the first to slip into Thu if needed. Sprint 1 starts Thu 26 Nov.
+- **Blocked:** none
+- **Next:** close Sprint 0 once SCRUM-9 and SCRUM-10 are Done; Sprint 1 starts Thu 26 Nov
+- **Schedule:** ahead of plan: Sprint 0 finishes a day early (planned end Wed 25 Nov).
 
 ### Labels
 | Group | Labels |
