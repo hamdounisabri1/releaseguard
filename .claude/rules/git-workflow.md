@@ -10,14 +10,15 @@
 ## Daily Git rhythm
 | When | Git action |
 |---|---|
-| Start of day | `git pull` on `main`, rebase any open Task branch onto it |
+| Start of day | `git pull` on `main`, rebase any open Task branch onto it. The daily "Today" block edit stays uncommitted until the day's first Task branch is created, then goes in as that branch's first commit |
 | Task starts (after its plan is approved) | Create the Task branch from the up-to-date `main` |
 | Each working step | Commit: one small step that works, with its tests passing (roughly 3–8 commits a day; no more than 1–2 hours of work per commit) |
 | End of session | Push the branch, even if unfinished (backup + CI); open a **draft PR** on the first push |
-| Task done | CI green → `/code-review` (plus the safety reviews where needed) → `/dod-check` → **the user squash-merges** → Jira Done |
+| Task done | CI green → **tick the Task's checkbox in `PROJECT_PLAN.md` (and move it to "Done today") on the Task branch** → `/code-review` (plus the safety reviews where needed) → `/dod-check` → **the user squash-merges** → Jira Done |
 | Sprint done | Tag `v0.N.0` on `main` and push the tag |
 
-- Never commit directly to `main`.
+- Never commit directly to `main`. **`main` is protected on both repos** by the ruleset `protect-main` (PR required, squash only, no bypass, admins included; see `infra/README.md`), so a direct push fails with GH013.
+- **Leave no edit behind on `main`.** Every file change goes through a branch and a PR, including process edits: the Task's own plan checkbox (ticked in its PR, before merge), the daily "Today" block (rides on the day's first Task branch), and sprint-close edits (retro, "Current sprint" line, leftover ticks) in a `docs/sprint-<N>-close` PR. Anything that would only happen after a merge must be done before it, inside the PR.
 - **The user merges every PR, by hand, in GitHub. Claude never merges** (`gh pr merge` and the MCP merge tool are denied in `.claude/settings.json`). Claude says when a PR is ready to merge; once `gh pr view <n> --json state` shows `MERGED`, it marks the Task Done, deletes the local branch and pulls `main`.
 - After merging, delete the branch and pull `main`.
 - Claude reminds the user at each of these points (commit after a green step, push at session end) and runs the command once the user says so.

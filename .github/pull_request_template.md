@@ -20,7 +20,8 @@ Scopes: api · web · worker · db · github · ai · infra · docs
 - [ ] Alembic migration reversible and tested on a fresh database (if any)
 - [ ] State-changing actions write audit entries
 - [ ] UI has empty, loading, error and permission-denied states (if UI)
-- [ ] Docs in sync: `CLAUDE.md`, `.claude/rules/`, guide, `.env.example`, plan checkbox
+- [ ] Docs in sync: `CLAUDE.md`, `.claude/rules/`, guide, `.env.example`
+- [ ] Task's checkbox in `docs/PROJECT_PLAN.md` ticked **in this PR** (and moved to "Done today")
 - [ ] Bug fix: regression test that fails without the fix (+ lesson if the class can recur)
 - [ ] Deployment, approval, webhook, session or token code: `/security-review` + `release-safety-reviewer` run
 - [ ] Screenshots (if UI)
