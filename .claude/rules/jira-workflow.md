@@ -30,7 +30,7 @@ The project has no Bug issue type (team-managed projects can't add one through t
 
 **Assignee:** every issue (Epic, Task, Sub-task, bug) is assigned to the project owner, the account behind the Jira credentials (`GET /rest/api/3/myself` gives its `accountId`), as soon as it is created. The MCP server's `jira_update_issue` silently ignores `assignee` (it reports success but nothing changes), so assign with REST: `PUT /rest/api/3/issue/{key}/assignee` with `{"accountId": "…"}`, then read the issue back to confirm.
 
-Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plus the daily `today` label (§4). Statuses: **To Do → In Progress → In Review → Done** (use the board's own names; check them before transitioning).
+Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plus the daily `today` label (§4). Statuses: **To Do → In Progress → Done**. The board has **no In Review column**: a Task stays *In Progress* through review until its PR is merged. Check the transition ids (`jira_get_transitions`) before transitioning.
 
 ## 2. Tickets and work
 - Sprint work always has a ticket. Only quick questions and small fixes to the docs outside sprint work may go ahead without one. For those, offer to create a ticket.
@@ -64,7 +64,7 @@ At the start of the **first session on a new date** (today differs from the date
 1. Read the active sprint's Tasks from Jira (status, Blocks links, `today` label) and the sprint's checklist in the plan.
 2. **Pick today's work:** about one working day (sum of estimates ≈ 1 day), Tasks from the **active sprint only**, unblocked (every blocker Done), in dependency and priority order (`p0` first). Unfinished Tasks from yesterday come first. If nothing in the active sprint is left, say the sprint is ready to close (§7).
 3. **Mark them in Jira with the `today` label only:** add `today` to the picks and remove it from anything no longer picked. Don't move issues to or from the backlog, between sprints, or re-rank them for the daily plan; leave status as it is. The user's view of today's work is the JQL `project = SCRUM AND labels = today`.
-4. **Update the plan:** rewrite the "Today" block in `PROJECT_PLAN.md` §5 (date, picks with keys, carried over, blocked, schedule note). Tick any checkbox whose Task is Done but not yet ticked.
+4. **Update the plan:** rewrite the "Today" block in `PROJECT_PLAN.md` §5 (date, picks with keys, carried over, blocked, schedule note). Tick any checkbox whose Task is Done but not yet ticked. `main` is protected, so this edit stays uncommitted until the day's first Task branch is created and goes in as its first commit (`git-workflow.md`, "Leave no edit behind on `main`").
 5. **Schedule check:** compare remaining estimates with the working days left in the sprint. If it's behind, say so and propose a fix (shift later dates by the same amount, or apply the cut list in §6 of the plan in order). Change dates or scope only after the user agrees.
 6. Report in at most 6 lines: today's picks, what carried over, what's blocked, and whether the sprint is on track.
 
@@ -74,8 +74,8 @@ These daily `today` label edits are pre-approved; don't ask before making them.
 0. Code changes happen only here, while working one Task or Sub-task. One ticket at a time.
 1. **The user starts the Task in plan mode** ("start SCRUM-12"). Read the ticket, its blockers and the matching rules files, then write the implementation plan (files, steps, tests including failure paths, docs to update).
 2. **After the user approves the plan:** move the Task to **In Progress**, add a short comment with the plan (≤ 5 lines), and branch `feat/SCRUM-<n>-<desc>` from an up-to-date `main`. While working, follow the daily Git rhythm in `git-workflow.md` (commit after each green step, push and open a draft PR at session end).
-3. When the code is done: push, wait for CI to be green, move to **In Review**, and run `/code-review` (plus `/security-review` and the `release-safety-reviewer` agent for auth, RBAC, webhooks, approvals, tokens).
-4. **Mark it Done automatically.** When `/dod-check` passes and the user has squash-merged the PR (Claude never merges; it checks `gh pr view <n> --json state` for `MERGED`), move the Task to **Done** without asking, with a closing comment (what changed, PR/commit link, how it was tested), remove its `today` label, and tick its checkbox in `PROJECT_PLAN.md`. If the DoD check fails, leave it In Review and say what's missing. Then check §7: if it was the sprint's last open Task, close the sprint.
+3. When the code is done: **on the Task branch, tick the Task's checkbox in `PROJECT_PLAN.md` and move it to "Done today" in the Today block**, so the merge lands them (`main` is protected; nothing can be ticked after the merge without another PR). Then push, wait for CI to be green, and run `/code-review` (plus `/security-review` and the `release-safety-reviewer` agent for auth, RBAC, webhooks, approvals, tokens). The Task stays **In Progress** (the board has no In Review column).
+4. **Mark it Done automatically.** When `/dod-check` passes and the user has squash-merged the PR (Claude never merges; it checks `gh pr view <n> --json state` for `MERGED`), move the Task to **Done** without asking, with a closing comment (what changed, PR/commit link, how it was tested), and remove its `today` label. These are Jira-only steps; no file changes happen after the merge. If the DoD check fails, leave it In Progress and say what's missing. If the PR is closed without merging, the tick never reaches `main`. Then check §7: if it was the sprint's last open Task, close the sprint.
 5. Comments are short and factual. Never put secrets, tokens or the Jira URL in a comment or in tracked files.
 
 ## 6. Bugs and new findings
@@ -86,9 +86,9 @@ These daily `today` label edits are pre-approved; don't ask before making them.
 
 ## 7. Sprint end (automatic when the last Task is Done)
 When every Task in the active sprint is Done:
-1. **Mark the sprint Done without asking:** transition its Epic to Done, complete the board sprint (`jira_update_sprint` with `state=closed`), and tick any remaining checkboxes in `PROJECT_PLAN.md`.
-2. **Start the next sprint:** set the next board sprint to `state=active` (the tool rejects a start date in the past, so use "now" if it starts late) and update the "Current sprint" line in `CLAUDE.md`.
-3. Draft the retro in `docs/retros/`, prune lessons (`maintenance.md` §3 cap), and offer the `v0.N.0` tag (tagging and pushing only when the user asks, per `git-workflow.md`).
+1. **Mark the sprint Done without asking:** transition its Epic to Done and complete the board sprint (`jira_update_sprint` with `state=closed`).
+2. **Start the next sprint:** set the next board sprint to `state=active` (the tool rejects a start date in the past, so use "now" if it starts late).
+3. **File changes go in one PR** (`main` is protected): on a `docs/sprint-<N>-close` branch, update the "Current sprint" line in `CLAUDE.md`, tick any remaining checkboxes in `PROJECT_PLAN.md`, draft the retro in `docs/retros/` and prune lessons (`maintenance.md` §3 cap). Push it, open the PR, and tell the user it's ready to merge. After it's merged, offer the `v0.N.0` tag on `main` (tagging and pushing only when the user asks, per `git-workflow.md`).
 
 If the sprint's end date passes with Tasks still open, the daily plan (§4) raises it: propose moving the leftovers to the next sprint (with a comment saying why) or applying the cut list, and let the user decide. Mid-sprint scope check: if behind, propose the cut list from `PROJECT_PLAN.md` §6.
 

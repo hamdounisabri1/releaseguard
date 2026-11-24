@@ -124,7 +124,7 @@ Every change that adds or alters project knowledge updates the matching doc **in
 | A command, script or tool in the dev loop | The **Commands** section above |
 | An application environment variable | `.env.example` and guide §14.6 |
 | An architectural decision | A new ADR via `/new-adr`; update the Architecture section above if the big picture changes |
-| Scope, dates or sprint tasks | [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) (tick checkboxes as items land) and the "Current sprint" line above |
+| Scope, dates or sprint tasks | [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) (tick a Task's checkbox in its own PR, before merge) and the "Current sprint" line above |
 | The data model, API, state machine or security model | The matching section of [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) |
 
 When something here turns out to be wrong (for example a planned command), fix it rather than working around it. Details, and the rules for regression tests and lessons, are in [maintenance.md](.claude/rules/maintenance.md).

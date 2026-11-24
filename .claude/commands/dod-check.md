@@ -15,5 +15,7 @@ Check the current change against the Definition of Done in `.claude/rules/git-wo
    - Docs in sync: walk the "Keep the docs in sync" table in `CLAUDE.md` and list each doc that should have changed but didn't
    - Bug fix: regression test, and a lesson only if `maintenance.md` §3 says so
    - New skills, plugins or MCP servers: committed and documented
+   - Plan checkbox: the Task's line in `docs/PROJECT_PLAN.md` is ticked **on this branch** (and listed under "Done today"). Missing → ❌ Not ready, because `main` is protected and the tick can't be added after the merge
+   - Nothing left behind: `git status` on this branch is clean or only holds changes meant for this PR (no stray process edits that would end up stranded on `main`)
 3. If the diff touches deployments, approvals, webhooks, sessions, RBAC or tokens, recommend `/security-review` and the `release-safety-reviewer` agent.
 4. End with **Ready / Not ready** and a short to-do list. Don't edit files or commit.
