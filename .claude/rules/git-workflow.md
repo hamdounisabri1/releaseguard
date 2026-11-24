@@ -14,10 +14,11 @@
 | Task starts (after its plan is approved) | Create the Task branch from the up-to-date `main` |
 | Each working step | Commit: one small step that works, with its tests passing (roughly 3–8 commits a day; no more than 1–2 hours of work per commit) |
 | End of session | Push the branch, even if unfinished (backup + CI); open a **draft PR** on the first push |
-| Task done | CI green → `/code-review` (plus the safety reviews where needed) → `/dod-check` → **squash-merge** → Jira Done |
+| Task done | CI green → `/code-review` (plus the safety reviews where needed) → `/dod-check` → **the user squash-merges** → Jira Done |
 | Sprint done | Tag `v0.N.0` on `main` and push the tag |
 
 - Never commit directly to `main`.
+- **The user merges every PR, by hand, in GitHub. Claude never merges** (`gh pr merge` and the MCP merge tool are denied in `.claude/settings.json`). Claude says when a PR is ready to merge; once `gh pr view <n> --json state` shows `MERGED`, it marks the Task Done, deletes the local branch and pulls `main`.
 - After merging, delete the branch and pull `main`.
 - Claude reminds the user at each of these points (commit after a green step, push at session end) and runs the command once the user says so.
 - **Commit on demand:** the user can ask for a commit (or a push) at any time, not only at these points. Claude does it right away: it reviews `git diff --staged` for secrets, writes a Conventional Commit message with the Jira key, and commits on the current Task branch. If the current branch is `main`, it creates the Task branch first, because nothing is committed directly to `main`.
