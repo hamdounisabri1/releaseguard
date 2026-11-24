@@ -35,6 +35,10 @@ uv run alembic upgrade head && uv run alembic check                # migration g
 cd frontend && pnpm install && pnpm dev                       # http://localhost:3000
 pnpm eslint . && pnpm tsc --noEmit && pnpm build
 
+# Local GitHub webhooks (dev App → smee channel → localhost:8000); steps in docs/GITHUB_APP_SETUP.md
+py -3 infra/scripts/webhook_echo.py        # stand-in receiver until SCRUM-45 (GITHUB_WEBHOOK_SECRET in the shell env)
+npx -y smee-client@5.0.0 --url https://smee.io/<channel> --target http://127.0.0.1:8000/api/v1/github/webhooks
+
 # GitHub repo settings (ruleset protect-main, squash-only, labels); idempotent, needs gh as repo admin
 infra/github/setup-repo.sh hamdounisabri1/releaseguard
 infra/github/setup-repo.sh hamdounisabri1/taskflow

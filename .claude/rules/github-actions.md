@@ -27,6 +27,7 @@ paths:
 
 ## GitHub App (backend side)
 - Use a separate development App (webhooks through a smee.io or cloudflared tunnel) and a production App.
+- Local webhooks come through a **smee.io** channel ([GITHUB_APP_SETUP.md § Run the webhook tunnel](../../docs/GITHUB_APP_SETUP.md#run-the-webhook-tunnel)). smee re-serializes the JSON body, so a delivery containing `\uXXXX` or `\/` escapes or big numbers fails the HMAC check locally. Confirm through a cloudflared tunnel before debugging the endpoint, and never relax the signature check to suit a tunnel.
 - Permissions: Actions read/write, Contents read, Metadata read. Nothing else.
 - Events: `workflow_run` only. Handle them idempotently by delivery ID. Accept an event only if its repository id, workflow path and `run-name` match the deployment. Out-of-order events must not move a deployment backwards (the state machine rejects them; log and ignore).
 - Only the **worker** calls GitHub. Dispatch with `return_run_details: true` and store the returned run id and URL; the reconcile sweep reads runs by id when a webhook is missing.
