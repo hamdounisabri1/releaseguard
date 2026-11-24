@@ -19,7 +19,7 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 ```bash
 # Git hooks (gitleaks, Ruff, ESLint, Prettier); once per clone, then they run on every commit
 uv tool install pre-commit && pre-commit install
-pre-commit run --all-files                                    # run every hook on the whole repo
+pre-commit run --all-files                                    # every hook on the whole repo (gitleaks still scans only staged changes)
 
 # Local stack
 docker compose -f infra/docker-compose.yml up -d db          # Postgres only
