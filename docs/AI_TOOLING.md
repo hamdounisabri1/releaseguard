@@ -70,7 +70,7 @@ Built-in skills the rules also reference (shipped with Claude Code, nothing to i
 
 | Item | Type | What it does |
 |---|---|---|
-| `.claude/hooks/pre_bash.py` | PreToolUse hook (Bash, PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key` (`.env.example` is allowed). On `git commit` runs `gitleaks` on staged changes **if gitleaks is installed** and blocks on findings |
+| `.claude/hooks/pre_bash.py` | PreToolUse hook (Bash, PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key` (`.env.example` is allowed). On `git commit` runs `gitleaks` on staged changes **if a `gitleaks` binary is on `PATH`** and blocks on findings. The main secret gate is the pre-commit gitleaks hook, which needs no separate install |
 | `.claude/hooks/post_edit.py` | PostToolUse hook (Edit, Write, MultiEdit) | Backend `*.py`: `uv run ruff format` + `ruff check --fix`. Frontend TS/JS: `eslint --fix`. Silent until `backend/pyproject.toml` or `frontend/node_modules` exists |
 | `release-safety-reviewer` | Subagent | Read-only review of a diff against the state-machine, approval, concurrency, tenancy, webhook, dispatch and secrets invariants |
 | `/sprint-status` | Command | Current sprint summary from the plan and Jira |
@@ -88,7 +88,8 @@ Hooks run with `python`. On Windows, if `python` opens the Microsoft Store stub,
 - [Claude Code](https://claude.com/claude-code)
 - Python 3.12+ on `PATH` as `python` (hooks) and [uv](https://docs.astral.sh/uv/)
 - [GitHub CLI](https://cli.github.com/): `winget install GitHub.cli` (Windows) or `brew install gh` (macOS)
-- [gitleaks](https://github.com/gitleaks/gitleaks): `winget install gitleaks` or `brew install gitleaks` (the commit hook uses it once installed)
+- [pre-commit](https://pre-commit.com/): `uv tool install pre-commit`, then `pre-commit install` in the clone. It runs gitleaks, Ruff, ESLint and Prettier on every commit and downloads gitleaks itself
+- Optional: a [gitleaks](https://github.com/gitleaks/gitleaks) binary on `PATH` (`winget install gitleaks` or `brew install gitleaks`) so the Claude commit hook also scans, and for ad hoc scans (`gitleaks git --redact .`)
 - Playwright for `webapp-testing`, isolated from your global Python: `uv tool install playwright && playwright install chromium`
 
 ### 2. Plugins

@@ -17,6 +17,10 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 > These are **planned** (from lifecycle guide §14.6 and §14.10). Verify them, and fix this section, once Sprint 0/1 scaffolding exists.
 
 ```bash
+# Git hooks (gitleaks, Ruff, ESLint, Prettier); once per clone, then they run on every commit
+uv tool install pre-commit && pre-commit install
+pre-commit run --all-files                                    # run every hook on the whole repo
+
 # Local stack
 docker compose -f infra/docker-compose.yml up -d db          # Postgres only
 docker compose -f infra/docker-compose.yml up --build        # everything
@@ -87,7 +91,7 @@ Detailed rules live in their own files so this file stays short. Files with a `p
 
 | What | Does |
 |---|---|
-| Hook `hooks/pre_bash.py` (PreToolUse, Bash/PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key`; runs gitleaks on `git commit` once gitleaks is installed |
+| Hook `hooks/pre_bash.py` (PreToolUse, Bash/PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key`; runs gitleaks on `git commit` if a `gitleaks` binary is on `PATH` (pre-commit's own gitleaks hook runs on every commit regardless) |
 | Hook `hooks/post_edit.py` (PostToolUse, Edit/Write) | Runs `ruff format` + `ruff check --fix` on backend Python and `eslint --fix` on frontend TS/JS once that tooling exists; reports leftover errors |
 | `settings.json` permissions | Denies reading secret files and deleting repos or files via the GitHub MCP; denies merging PRs (`gh pr merge`, MCP merge: the user merges by hand); asks before `git push` or pushing files via MCP |
 | Agent `release-safety-reviewer` | Checks a diff against the state-machine, approval, webhook, tenancy and dispatch invariants |
