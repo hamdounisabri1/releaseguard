@@ -107,7 +107,7 @@ gantt
 Each sprint has about **8.5 working days of planned work and 1.5 days of buffer**. Every sprint ends with a tagged release (`v0.N.0`), a 10-minute self-demo recording or notes, and a short retro note in `docs/retros/`.
 
 ### Sprint 0: Setup (Sun 22 – Wed 25 Nov 2026, extended) · Epic SCRUM-5
-- [ ] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
+- [x] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
 - [ ] SCRUM-7 Protect `main`, add PR template (draft in `.github/pull_request_template.md`), labels, and the Jira `SCRUM` board with the Sprint 0 Epic (the Epics, Tasks and board sprints for Sprints 1–6 are then created up front in one pass; see [§5](#5-work-tracking))
 - [ ] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only)
 - [ ] SCRUM-9 Set up a webhook tunnel (smee.io or cloudflared)
@@ -319,10 +319,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Tue 24 Nov 2026
-- **Today's Tasks:** SCRUM-6 Repos: monorepo layout + taskflow repo (0.5d) · SCRUM-11 ADR-0001 and ADR-0002 (0.25d; drafted 23 Nov, needs final review)
-- **Carried over:** SCRUM-6 (In Progress since 23 Nov)
-- **Blocked:** SCRUM-7, SCRUM-8, SCRUM-10 (wait on SCRUM-6); SCRUM-9 (waits on SCRUM-8)
-- **Schedule:** Sprint 0 was extended to Wed 25 Nov. 2.25d of work is left for 2 days: tight but on track, if SCRUM-6 lands today so SCRUM-7, -8 and -10 can start. Sprint 1 starts Thu 26 Nov.
+- **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1)
+- **Today's Tasks:** SCRUM-8 Development GitHub App (0.5d, p0) · SCRUM-11 ADR-0001 and ADR-0002 (0.25d; drafted 23 Nov, needs final review) · SCRUM-7 Protect main on both repos, PR template, labels (0.25d)
+- **Carried over:** none
+- **Blocked:** SCRUM-9 (waits on SCRUM-8)
+- **Next (Wed 25 Nov):** SCRUM-9 webhook tunnel (0.25d) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example` (0.5d)
+- **Schedule:** Sprint 0 was extended to Wed 25 Nov. 1.75d of work is left for about 1.5 days: tight but on track. SCRUM-10 is the first to slip into Thu if needed. Sprint 1 starts Thu 26 Nov.
 
 ### Labels
 | Group | Labels |
