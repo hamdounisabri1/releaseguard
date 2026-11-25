@@ -1081,6 +1081,7 @@ docker compose -f infra/docker-compose.yml up --build
 | Variable | Used by | Notes |
 |---|---|---|
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…`. Required. Tests use `TEST_DATABASE_URL` (a separate database, rebuilt from the migrations each run) |
+| `SEED_PASSWORD` | seed script | Password of the seeded local users (default `releaseguard-dev`). The seed refuses `ENV=production` |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
 | `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |

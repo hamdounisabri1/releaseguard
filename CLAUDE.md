@@ -14,7 +14,7 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 
 ## Commands
 
-> Lines marked `(planned)` don't work yet; verify each one, and drop its marker, when the Task that adds it lands. The other backend lines are verified (SCRUM-18, SCRUM-19).
+> Lines marked `(planned)` don't work yet; verify each one, and drop its marker, when the Task that adds it lands. The other backend lines are verified (SCRUM-18…25).
 
 ```bash
 # Git hooks (gitleaks, Ruff, ESLint, Prettier); once per clone, then they run on every commit
@@ -28,7 +28,7 @@ docker compose -f infra/docker-compose.yml up --build        # everything
 # Backend (Python 3.12+, uv). Run from backend/; `uv run` uses the project venv.
 # Settings come from env vars or the repo-root .env; SITE_ORIGIN is required, and ENV defaults to production (set ENV=local).
 cd backend && uv sync                                              # Python 3.12 is pinned in .python-version
-uv run alembic upgrade head && uv run python -m app.scripts.seed   # migrate (seed: planned, SCRUM-25)
+uv run alembic upgrade head && uv run python -m app.scripts.seed   # migrate + idempotent seed (workspace acme, 4 users, TaskFlow; refuses ENV=production)
 uv run uvicorn app.main:app --reload                               # http://localhost:8000/docs
 uv run python -m app.worker                                        # (planned) worker: job loop + sweeps
 uv run pytest                                                      # all tests; needs Postgres at TEST_DATABASE_URL (default postgres:postgres@127.0.0.1:5432/releaseguard_test), rebuilt by the migrations each run

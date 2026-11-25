@@ -9,6 +9,7 @@ cd backend
 uv sync                                   # creates .venv (uv downloads Python 3.12 if needed)
 uv run uvicorn app.main:app --reload      # http://localhost:8000/docs
 uv run alembic upgrade head               # migrate DATABASE_URL
+uv run python -m app.scripts.seed         # local data (idempotent; refuses ENV=production)
 uv run pytest                             # tests (Postgres at TEST_DATABASE_URL)
 uv run ruff check . && uv run ruff format --check . && uv run mypy app tests
 ```
@@ -37,6 +38,19 @@ Settings come from environment variables, falling back to the repository-root `.
 | `migrations/` | Alembic. `0001` also creates `forbid_history_mutation()` and the `audit_logs` append-only triggers (UPDATE, DELETE, TRUNCATE) |
 
 Tests build their own app with `tests/conftest.py::build_app(**settings)`, which also mounts test-only routes. Database tests use the `db` fixture (a session in a transaction that is rolled back; services' `commit()` becomes a savepoint) and `db_client` (requests share that session); build data with `tests/factories.py`.
+
+## Seeded local data (SCRUM-25)
+
+`python -m app.scripts.seed` creates workspace **Acme** (`acme`, `block_self_approval` on), the **TaskFlow** application (`hamdounisabri1/taskflow`) with its three environments, and one user per role. These are **non-production credentials**; the password is `SEED_PASSWORD` (default `releaseguard-dev`):
+
+| Email | Role |
+|---|---|
+| `admin@example.com` | Admin |
+| `developer@example.com` | Developer |
+| `reviewer@example.com` | Reviewer |
+| `viewer@example.com` | Viewer |
+
+Re-running it creates only what is missing. It refuses to run with `ENV=production`.
 
 ## Layout as it grows
 

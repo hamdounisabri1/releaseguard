@@ -25,6 +25,22 @@ def get_workspace(db: Session, workspace_id: uuid.UUID) -> Workspace | None:
     return db.get(Workspace, workspace_id)
 
 
+def get_workspace_by_slug(db: Session, slug: str) -> Workspace | None:
+    return db.scalar(select(Workspace).where(Workspace.slug == slug))
+
+
+def add(db: Session, row: User | Workspace | WorkspaceMember) -> None:
+    """Insert a user, workspace or membership (used by the seed; member management is S6)."""
+    db.add(row)
+    db.flush()
+
+
+def get_membership(
+    db: Session, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> WorkspaceMember | None:
+    return db.get(WorkspaceMember, (workspace_id, user_id))
+
+
 def first_active_membership(db: Session, user_id: uuid.UUID) -> WorkspaceMember | None:
     """The workspace a login lands in. v1 has one workspace per user; the oldest one wins."""
     statement = (
