@@ -71,7 +71,7 @@ At the start of the **first session on a new date** (today differs from the date
 These daily `today` label edits are pre-approved; don't ask before making them.
 
 ## 5. Working a ticket
-0. Code changes happen only here, while working one Task or Sub-task. One ticket at a time.
+0. Code changes happen only here, while working one Task or Sub-task. One ticket at a time, **except bulk completion**: when the user asks to complete several Tasks together ("bulk complete", or names more than one), they share one branch and one PR (`git-workflow.md`, "Bulk completion = one PR"). Move each of them to In Progress, tick each checkbox in that PR, and mark each Done (with its own closing comment linking the shared PR) once it merges.
 1. **The user starts the Task in plan mode** ("start SCRUM-12"). Read the ticket, its blockers and the matching rules files, then write the implementation plan (files, steps, tests including failure paths, docs to update).
 2. **After the user approves the plan:** move the Task to **In Progress**, add a short comment with the plan (≤ 5 lines), and branch `feat/SCRUM-<n>-<desc>` from an up-to-date `main`. While working, follow the daily Git rhythm in `git-workflow.md` (commit after each green step, push and open a draft PR at session end).
 3. When the code is done: **on the Task branch, tick the Task's checkbox in `PROJECT_PLAN.md` and move it to "Done today" in the Today block**, so the merge lands them (`main` is protected; nothing can be ticked after the merge without another PR). Then push, wait for CI to be green, and run `/code-review` (plus `/security-review` and the `release-safety-reviewer` agent for auth, RBAC, webhooks, approvals, tokens). The Task stays **In Progress** (the board has no In Review column).

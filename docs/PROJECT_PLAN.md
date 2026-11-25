@@ -106,7 +106,7 @@ gantt
 
 Each sprint has about **8.5 working days of planned work and 1.5 days of buffer**. Every sprint ends with a tagged release (`v0.N.0`), a 10-minute self-demo recording or notes, and a short retro note in `docs/retros/`.
 
-### Sprint 0: Setup (Sun 22 – Wed 25 Nov 2026, extended) · Epic SCRUM-5
+### Sprint 0: Setup (Sun 22 – Wed 25 Nov 2026, extended; closed Tue 24 Nov) · Epic SCRUM-5 ✓
 - [x] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
 - [x] SCRUM-7 Protect `main` (ruleset `protect-main`, [infra/README.md](../infra/README.md#github-repository-settings)), add PR template, labels, and the Jira `SCRUM` board with the Sprint 0 Epic (the Epics, Tasks and board sprints for Sprints 1–6 are then created up front in one pass; see [§5](#5-work-tracking))
 - [x] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only). Steps: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)
@@ -313,18 +313,18 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 2. **Sprints run one at a time.** Only the current board sprint is active; the rest wait in the *future* state.
 3. **Every day, Claude plans the day.** In the first session of each new date, Claude picks about a day's worth of unblocked Tasks from the active sprint, labels them `today` in Jira (JQL `project = SCRUM AND labels = today`) and rewrites the "Today" block below.
 4. **Each Task starts in plan mode.** The developer opens a Task in plan mode; Claude writes the plan, and the Task moves to *In Progress* once the plan is approved.
-5. **Git per Task:** one branch and one PR per Task. Commit after each working step, push at the end of every session (with a draft PR from the first push), and the developer squash-merges by hand once CI is green and the reviews pass (Claude never merges). Full rhythm in [`git-workflow.md`](../.claude/rules/git-workflow.md#daily-git-rhythm).
+5. **Git per Task:** one branch and one PR per Task, branched from `main` (never stacked on another Task branch). When the developer asks to complete several Tasks in bulk, they share one branch and one PR that lists every key. Commit after each working step, push at the end of every session (with a draft PR from the first push), and the developer squash-merges by hand once CI is green and the reviews pass (Claude never merges). Full rhythm in [`git-workflow.md`](../.claude/rules/git-workflow.md#daily-git-rhythm).
 6. **Done is automatic.** Claude ticks the Task's checkbox inside its own PR (`main` is protected), then moves the Task to *Done* as soon as it passes `/dod-check` and the PR is merged. When the sprint's last Task is Done, Claude closes the Epic and the board sprint, starts the next sprint, and drafts the retro.
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Tue 24 Nov 2026
 - **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1) · SCRUM-8 Development GitHub App (PR #2) · SCRUM-7 Protect main on both repos, PR template, labels (PR #3) · SCRUM-11 ADR-0001 and ADR-0002 · SCRUM-9 Webhook tunnel (smee.io) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example`
-- **Today's Tasks:** none left in Sprint 0
+- **Today's Tasks:** none left. Sprint 0 is closed ([retro](retros/sprint-0.md)); PRs #5 → #6 → #7 → sprint-close await squash-merge, in that order
 - **Carried over:** none
 - **Blocked:** none
-- **Next:** close Sprint 0 once SCRUM-9 and SCRUM-10 are Done; Sprint 1 starts Thu 26 Nov
-- **Schedule:** ahead of plan: Sprint 0 finishes a day early (planned end Wed 25 Nov).
+- **Next:** Sprint 1 (board sprint already active). Its first Task, SCRUM-18 (FastAPI skeleton), can start early on Wed 25 Nov if you want
+- **Schedule:** ahead of plan: Sprint 0 closed a day early (planned end Wed 25 Nov).
 
 ### Labels
 | Group | Labels |
