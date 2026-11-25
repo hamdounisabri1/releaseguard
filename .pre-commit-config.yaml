@@ -4,7 +4,7 @@
 #   Update the pinned revs:  pre-commit autoupdate --freeze
 # Every hook runs only on matching staged files, so the backend/, worker/ and
 # frontend/ hooks skip cleanly until those folders contain code.
-# Keep the Ruff rev equal to the ruff version pinned in backend/pyproject.toml (Sprint 1).
+# Keep the Ruff rev equal to the ruff version pinned in backend/pyproject.toml.
 
 repos:
   # Secrets: blocks a commit whose staged changes contain a credential.
