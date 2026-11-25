@@ -7,6 +7,7 @@ from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.security import OriginCheckMiddleware
+from app.db.session import create_db_engine, create_session_factory
 from app.schemas.errors import COMMON_ERROR_RESPONSES
 
 API_VERSION = "0.1.0"
@@ -22,6 +23,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         responses=COMMON_ERROR_RESPONSES,
     )
     app.state.settings = settings
+    # Lazy: nothing connects until the first query, so the app starts without a database
+    # (/readyz reports it).
+    app.state.engine = create_db_engine(settings.database_url)
+    app.state.session_factory = create_session_factory(app.state.engine)
 
     register_exception_handlers(app)
 

@@ -14,7 +14,7 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 
 ## Commands
 
-> Lines marked `(planned)` don't work yet; verify each one, and drop its marker, when the Task that adds it lands. The other backend lines are verified (SCRUM-18).
+> Lines marked `(planned)` don't work yet; verify each one, and drop its marker, when the Task that adds it lands. The other backend lines are verified (SCRUM-18, SCRUM-19).
 
 ```bash
 # Git hooks (gitleaks, Ruff, ESLint, Prettier); once per clone, then they run on every commit
@@ -28,13 +28,13 @@ docker compose -f infra/docker-compose.yml up --build        # everything
 # Backend (Python 3.12+, uv). Run from backend/; `uv run` uses the project venv.
 # Settings come from env vars or the repo-root .env; SITE_ORIGIN is required, and ENV defaults to production (set ENV=local).
 cd backend && uv sync                                              # Python 3.12 is pinned in .python-version
-uv run alembic upgrade head && uv run python -m app.scripts.seed   # (planned, SCRUM-19/25) migrate + seed
+uv run alembic upgrade head && uv run python -m app.scripts.seed   # migrate (seed: planned, SCRUM-25)
 uv run uvicorn app.main:app --reload                               # http://localhost:8000/docs
 uv run python -m app.worker                                        # (planned) worker: job loop + sweeps
-uv run pytest                                                      # all tests (Postgres needed from SCRUM-19)
+uv run pytest                                                      # all tests; needs Postgres at TEST_DATABASE_URL (default postgres:postgres@127.0.0.1:5432/releaseguard_test), rebuilt by the migrations each run
 uv run pytest tests/path/test_file.py::test_name                   # single test
 uv run ruff check . && uv run ruff format --check . && uv run mypy app tests   # lint + types
-uv run alembic upgrade head && uv run alembic check                # (planned, SCRUM-19) migration gate
+uv run alembic upgrade head && uv run alembic downgrade -1 && uv run alembic upgrade head && uv run alembic check   # migration gate (DATABASE_URL)
 
 # Frontend (Node 22 LTS, pnpm 10 pinned in package.json: `corepack install -g pnpm@10.34.9` once; corepack can't run pnpm 12 yet)
 cd frontend && pnpm install && pnpm dev                       # http://localhost:3000 (/ redirects to /dashboard)
