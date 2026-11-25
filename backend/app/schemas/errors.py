@@ -17,6 +17,11 @@ class ErrorResponse(BaseModel):
     error: ErrorDetail
 
 
+# Routes behind the session cookie (and login itself).
+UNAUTHORIZED_RESPONSE: dict[int | str, dict[str, Any]] = {
+    401: {"model": ErrorResponse, "description": "Missing, invalid or expired session."},
+}
+
 # Error responses any route may return; set app-wide in ``create_app``.
 COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     403: {"model": ErrorResponse, "description": "Forbidden (role, or foreign `Origin`)."},

@@ -110,7 +110,7 @@ Every day runs 09:00–13:00 and 14:00–20:00. Each sprint ends with a 15-minut
 | Day | Sprint | Time blocks → Tasks | Planned | Buffer |
 |---|---|---|---|---|
 | Wed 25 Nov | S1 (head start) | SCRUM-26 Next.js shell, if time allows (frees 1 h on Thu) | 1 h | — |
-| Thu 26 Nov | S1 Foundation | 09:00–13:00 SCRUM-19, 20, 23 · 14:00–17:30 SCRUM-21, 22, 24, 25 · 17:30–18:30 SCRUM-26 | 8.5 h | 1.5 h |
+| Thu 26 Nov | S1 Foundation | 09:00–13:00 SCRUM-19, 20, 22 · 14:00–17:30 SCRUM-21, 23, 24, 25 · 17:30–18:30 SCRUM-26 | 8.5 h | 1.5 h |
 | Fri 27 Nov | S1 Foundation | 09:00–12:30 SCRUM-27, 28, 30 · 14:00–15:30 SCRUM-31, 29 · 15:30–18:30 SCRUM-32, 33, 34 · 18:30 close → `v0.1.0` | 8 h + 15 min | 1.75 h |
 | Sat 28 Nov | S2 Releases | 09:00–13:00 SCRUM-35, 40, 38, 39, 36, 41, 52, 43 · 14:00–17:15 SCRUM-44, 45, 37, 42, 46 · 17:15–19:45 SCRUM-47, 48, 49, 50, 51, 53 · 19:45 close → `v0.2.0` | 9.75 h + 15 min | 0 |
 | Sun 29 Nov | S3 Approvals | 09:00–13:00 SCRUM-54, 55, 56, 57 · 14:00–16:30 SCRUM-58, 59, 64, 65, 66 · 16:30–19:30 SCRUM-60, 61, 62, 63 · 19:30 close → `v0.3.0` | 9.5 h + 15 min | 15 min |
@@ -142,13 +142,13 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 **Backend**
 - [x] SCRUM-18 FastAPI app skeleton: `core/config.py` (pydantic-settings), `core/security.py`, `core/permissions.py`, the `api/v1` router layout, a standard error shape, and the **Origin-check CSRF middleware** ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md))
-- [ ] SCRUM-19 *(2 h)* SQLAlchemy 2.0 models and the first Alembic migration: `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments` (health fields + `policy` JSONB + health state), `audit_logs` with the **append-only trigger**; `workspace_id` and composite FKs on every tenant table
-- [ ] SCRUM-20 *(1.5 h)* Auth: argon2id, server-side sessions (hashed id, idle and absolute timeout, rotate on login), `HttpOnly`/`Secure`/`SameSite=Lax` cookie, login, logout and `me`
-- [ ] SCRUM-21 *(1 h)* RBAC dependency: `require_role(Role.ADMIN, …)` plus workspace scoping on every query
-- [ ] SCRUM-22 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
-- [ ] SCRUM-23 *(30 min)* Audit log helper, `record_audit(actor, action, target, details)`, used by every state-changing service
-- [ ] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
-- [ ] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
+- [x] SCRUM-19 *(2 h)* SQLAlchemy 2.0 models and the first Alembic migration: `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments` (health fields + `policy` JSONB + health state), `audit_logs` with the **append-only trigger**; `workspace_id` and composite FKs on every tenant table
+- [x] SCRUM-20 *(1.5 h)* Auth: argon2id, server-side sessions (hashed id, idle and absolute timeout, rotate on login), `HttpOnly`/`Secure`/`SameSite=Lax` cookie, login, logout and `me`
+- [x] SCRUM-21 *(1 h)* RBAC dependency: `require_role(Role.ADMIN, …)` plus workspace scoping on every query
+- [x] SCRUM-22 *(30 min)* Audit log helper, `record_audit(actor, action, target, details)`, used by every state-changing service
+- [x] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
+- [x] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
+- [x] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
 
 **Frontend**
 - [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
@@ -340,12 +340,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Wed 25 Nov 2026
-- **Done today:** SCRUM-18 Backend skeleton (PR #10 merged, Done in Jira) · SCRUM-26 Next.js App Router shell (sidebar, top bar, in-shell 404; this PR)
-- **Today's Tasks:** none left (SCRUM-26, the head start on Thu's 17:30 block, is done, which frees 1 h on Thu)
+- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (this PR): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping · SCRUM-23 application + environment CRUD · SCRUM-25 seed script
+- **Today's Tasks:** bulk SCRUM-19…25 (Thu's 09:00–17:30 backend blocks, started a day early; one PR). SCRUM-22/23 lines corrected to match Jira (22 = audit helper, 23 = CRUD)
 - **Carried over:** none
 - **Blocked:** none
-- **Next:** Thu 26 Nov 09:00: SCRUM-19 (2 h), then SCRUM-20 and SCRUM-23 (see the [timetable](#daily-timetable))
-- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 15.5 h left of 20 h (SCRUM-26 done a day early)
+- **Next:** after the bulk PR merges: SCRUM-27, 28 (API client, login page; see the [timetable](#daily-timetable))
+- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 8 h left of 20 h (SCRUM-26 and the 7.5 h SCRUM-19…25 bulk done a day early, pending merge)
 
 ### Labels
 | Group | Labels |

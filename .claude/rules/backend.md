@@ -12,6 +12,7 @@ paths:
 - **Services own the rules:** permission checks, state transitions, transactions, job enqueueing, audit entries.
 - **The API process never makes outbound network calls** (GitHub, LLM, health URLs). It writes state plus a `jobs` row in one transaction; the worker does the I/O (ADR-0001).
 - **Repositories only do data access.** Every query takes `workspace_id` (or joins to it). Repositories never commit: the **service layer owns the transaction boundary**.
+- **Database access is synchronous** SQLAlchemy 2.0 + psycopg 3 (async psycopg can't run on Windows' default event loop; sync keeps Alembic and test rollback simple). Routes and dependencies that touch the DB are plain `def` (FastAPI runs them in its threadpool); take the session with `DbSession` from `app/api/deps.py`. Worker code calls DB functions through `asyncio.to_thread`.
 - Use the Pydantic v2 and SQLAlchemy 2.0 APIs. Check current docs with context7 rather than relying on memory.
 - The `fastapi-templates` skill is fine for dependencies, error handling and async patterns, but **not** for auth or layout: it teaches JWT/OAuth2 and an `endpoints/` folder. Auth here is server-side sessions (`security.md`) and the layout is the one above.
 
@@ -31,11 +32,13 @@ paths:
 - The dispatch job calls the GitHub dispatch API with `return_run_details`, stores `workflow_run_id` and URL, and moves `queued → deploying`. After `max_attempts` its failure hook moves `queued → failed` (`dispatch_failed`).
 
 ## API conventions
-- Prefix `/api/v1`, JSON only, paginated lists.
+- Prefix `/api/v1`, JSON only, paginated lists: `page` (from 1) and `page_size` (≤ 100) in, `Page[T]` (`app/schemas/common.py`: `items`, `total`, `page`, `page_size`) out.
+- Request bodies use `extra="forbid"`, so unknown fields (or ones not editable yet) are a 422. PATCH bodies change only the fields sent (`model_dump(exclude_unset=True)`); audit entries record `{"changes": {field: {"from", "to"}}}` and are skipped when nothing changed.
+- Map a unique-constraint `IntegrityError` to a named 409 by catching it around a `db.begin_nested()` savepoint and matching the constraint name; re-raise anything else.
 - Error shape: `{"error": {"code", "message", "details"}}`. Use 403 for a role failure, 404 for another workspace's resource, 409 for an invalid state or lock conflict, 422 for validation.
 - A 422 returns each error's `msg` as is, so **custom Pydantic validators never put the submitted value in their message** (`raise ValueError("must be a bare origin")`, not `f"{value} is invalid"`): it may be a password or token.
 - `/healthz` (liveness) and `/readyz` (DB reachable) are public.
-- Every state-changing service calls `record_audit(actor, action, target, details)`.
+- Every state-changing service calls `record_audit(db, actor, action, target, details)` (`app/services/audit.py`) **before** it commits, so the row shares the change's transaction. `actor` is `Actor.user(workspace_id, user_id)` or `Actor.system(workspace_id)`; `action` is `<area>.<verb>` (`application.created`); `target` is `AuditTarget(type, id)`. Details are redacted like log fields; record what changed (field names, old/new values), never secrets.
 
 ## Integrations
 - Make external HTTP calls with `httpx` (explicit timeouts) wrapped in `tenacity` bounded retries. Never call GitHub or AI inside a request that holds a DB transaction open.
@@ -50,5 +53,7 @@ paths:
 - Health: verification needs `verify_successes` consecutive passes within `verify_timeout_seconds`; `failure_threshold` consecutive failures or the timeout → `unhealthy`. Scheduled checks change only `environments.health_status`, and only after `failure_threshold` **consecutive** failures. Every health URL goes through the SSRF guard (`security.md`).
 
 ## Logging
-- `structlog` JSON with `request_id`, `workspace_id`, `user_id`, `deployment_id` and `workflow_run_id` where known. Middleware propagates `X-Request-ID`.
+- `structlog` JSON (`app/core/logging.py`) with `request_id`, `workspace_id`, `user_id`, `deployment_id` and `workflow_run_id` where known: bind them with `structlog.contextvars.bind_contextvars`, and get loggers with `app.core.logging.get_logger`. Stdlib loggers (uvicorn, SQLAlchemy) go through the same JSON formatter.
+- `RequestIdMiddleware` (outermost) reuses a plain incoming `X-Request-ID` (`[A-Za-z0-9._-]{1,64}`) or makes one, echoes it on every response and writes one access line per request: method, path (**never the query string**), status, duration.
+- Values under sensitive keys (`password`, `secret`, `token`, `cookie`, `authorization`, `api_key`, `private_key`, `credential`) are redacted by a processor, nested ones too. Still never log request bodies, headers or exception text that can carry a connection URL.
 - Store timestamps as UTC (`timestamptz`).

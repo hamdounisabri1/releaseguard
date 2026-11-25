@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Public origin of the app (Caddy serves / and /api on it). Required: it drives the CSRF
     # Origin check (ADR-0007).
     site_origin: str
+    # Required. SQLAlchemy URL of the PostgreSQL database, ``postgresql+psycopg://…``. Holds a
+    # password: never log it.
+    database_url: str = Field(repr=False)
     # Extra origins accepted by the Origin check and CORS, only when env == "local" (frontend and
     # API on different ports). Comma-separated in the environment.
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)

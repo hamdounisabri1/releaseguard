@@ -1,8 +1,9 @@
 """Roles and the capability matrix (guide §3.1).
 
-Pure data with no database access. SCRUM-21 builds the ``require_role`` dependency on top of it;
-the service layer stays responsible for workspace scoping and finer rules (self-approval, a
-reviewer deciding twice, stale or expired requests).
+Pure data with no database access, and the only place the matrix is written down. Routes check it
+with ``require_capability`` / ``require_role`` (``app/api/deps.py``) and services again with
+``app.services.authz.ensure_can``; services also own workspace scoping and finer rules
+(self-approval, a reviewer deciding twice, stale or expired requests).
 """
 
 from collections.abc import Mapping
@@ -50,3 +51,10 @@ ROLE_CAPABILITIES: Mapping[Role, frozenset[Capability]] = MappingProxyType(
 
 def has_capability(role: Role, capability: Capability) -> bool:
     return capability in ROLE_CAPABILITIES[role]
+
+
+def roles_with(capability: Capability) -> frozenset[Role]:
+    """The roles that hold ``capability``, derived from the one matrix above."""
+    return frozenset(
+        role for role, capabilities in ROLE_CAPABILITIES.items() if capability in capabilities
+    )

@@ -501,7 +501,7 @@ erDiagram
 
     users {
         uuid id PK
-        citext email UK
+        string email UK "stored lowercased (CHECK)"
         string display_name
         string password_hash
         string status
@@ -526,6 +526,7 @@ erDiagram
         bytea token_hash UK
         uuid user_id FK
         uuid workspace_id FK
+        timestamptz created_at
         timestamptz expires_at
         timestamptz last_seen_at
     }
@@ -550,7 +551,10 @@ erDiagram
         string default_branch
         string ci_workflow_path
         string deploy_workflow_path
-        string status
+        string status "active|archived"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz archived_at
     }
     environments {
         uuid id PK
@@ -570,6 +574,7 @@ erDiagram
         int consecutive_failures
         timestamptz last_checked_at
         timestamptz next_check_at
+        timestamptz created_at
     }
     releases {
         uuid id PK
@@ -691,7 +696,7 @@ Two infrastructure tables sit outside the diagram:
 ### 7.3 Integrity, indexing and conventions
 - Foreign keys on every relationship; never cascade-delete deployment, decision, event or audit history.
 - **CHECK constraints** on every status, decision, role, kind and `operation_type` value (mirrored in Python enums), and on `image_digest ~ '^sha256:[0-9a-f]{64}$'`.
-- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on applications, `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null).
+- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on active applications (partial index; archiving frees the repository), `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null).
 - **Single active deployment per environment:** `CREATE UNIQUE INDEX deployments_one_active_per_env ON deployments (environment_id) WHERE status IN ('queued','deploying','verifying')`. A unique violation maps to **409**.
 - **Indexes:** `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
 - **Append-only history:** a trigger rejects `UPDATE` and `DELETE` on `audit_logs` and `deployment_events`.
@@ -1080,8 +1085,8 @@ docker compose -f infra/docker-compose.yml up --build
 
 | Variable | Used by | Notes |
 |---|---|---|
-| `DATABASE_URL` | backend, worker | `postgresql+psycopg://…` |
-| `SESSION_SECRET` | backend | Random 32+ bytes |
+| `DATABASE_URL` | backend, worker | `postgresql+psycopg://…`. Required. Tests use `TEST_DATABASE_URL` (a separate database, rebuilt from the migrations each run) |
+| `SEED_PASSWORD` | seed script | Password of the seeded local users (default `releaseguard-dev`). The seed refuses `ENV=production` |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
 | `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
