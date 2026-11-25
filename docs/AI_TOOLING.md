@@ -29,7 +29,7 @@ All plugins come from the official marketplace, `claude-plugins-official`.
 | **github** | GitHub MCP server: issues, pull requests, repositories, Actions | PRs, repos, checking GitHub Actions runs (TaskFlow workflows). Destructive tools are denied or need approval in `settings.json` |
 | **context7** | Up-to-date, version-specific library documentation | Current docs for Next.js, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic |
 | **security-guidance** | Works **passively**: flags security problems while code is written (injection, XSS, SSRF, hard-coded secrets and more). Nothing to invoke | Webhook signature checks, RBAC, approval logic, token handling |
-| **commit-commands** | Commit, push and open-PR commands | Conventional Commits and the squash-merge PR flow |
+| **commit-commands** | Commit, push and open-PR commands | Conventional Commits and the rebase-merge PR flow |
 | **claude-md-management** | Audits and updates `CLAUDE.md` | Keeping project instructions current as the code grows |
 
 ## MCP servers (`.mcp.json`)
