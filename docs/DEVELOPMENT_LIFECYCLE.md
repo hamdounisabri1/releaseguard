@@ -526,6 +526,7 @@ erDiagram
         bytea token_hash UK
         uuid user_id FK
         uuid workspace_id FK
+        timestamptz created_at
         timestamptz expires_at
         timestamptz last_seen_at
     }
@@ -550,7 +551,10 @@ erDiagram
         string default_branch
         string ci_workflow_path
         string deploy_workflow_path
-        string status
+        string status "active|archived"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz archived_at
     }
     environments {
         uuid id PK
@@ -570,6 +574,7 @@ erDiagram
         int consecutive_failures
         timestamptz last_checked_at
         timestamptz next_check_at
+        timestamptz created_at
     }
     releases {
         uuid id PK
