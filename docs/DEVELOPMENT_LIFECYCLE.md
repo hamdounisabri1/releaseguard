@@ -1215,14 +1215,14 @@ curl -fsS https://<host>/api/v1/healthz
 
 Six vertical slices. Each one ends in a working demo. Full detail: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
-| Phase | Weeks | Scope | Definition of done |
+| Phase | Days (compressed 25 Nov 2026) | Scope | Definition of done |
 |---|---|---|---|
-| 1. Foundation | 1–2 | Next.js, FastAPI, Postgres, migrations, auth, workspace roles, app and env CRUD | A user can sign in, create an app and configure its environments |
-| 2. Releases and tracking | 3–4 | OIDC release registration, `deploy.yml`, worker + jobs table, dispatch, webhooks, reconcile, state machine, history pages | A real CI run creates a release, and its dev and staging deployments are tracked live |
-| 3. Approval engine | 5–6 | Environment policy, decisions, expiry and stale rules, production gate, audit UI | A production deployment cannot proceed without the required approval |
-| 4. Health and rollback | 7–8 | Verification and scheduled HTTP checks, SSRF guard, env health, manual rollback | A failed or unhealthy release can be replaced by an earlier known-good artifact |
-| 5. AI assistant | 9–10 | Sanitized log analysis, structured summaries, release notes, saved reports | A failed deployment shows a useful AI explanation without controlling operations |
-| 6. DevOps delivery | 11–12 | Dockerization, CI for ReleaseGuard, test automation, Trivy, VPS deploy, backups, monitoring | The platform is deployed and the end-to-end demo is repeatable |
+| 1. Foundation | 26–27 Nov | Next.js, FastAPI, Postgres, migrations, auth, workspace roles, app and env CRUD | A user can sign in, create an app and configure its environments |
+| 2. Releases and tracking | 28 Nov | OIDC release registration, `deploy.yml`, worker + jobs table, dispatch, webhooks, reconcile, state machine, history pages | A real CI run creates a release, and its dev and staging deployments are tracked live |
+| 3. Approval engine | 29 Nov | Environment policy, decisions, expiry and stale rules, production gate, audit UI | A production deployment cannot proceed without the required approval |
+| 4. Health and rollback | 30 Nov | Verification and scheduled HTTP checks, SSRF guard, env health, manual rollback | A failed or unhealthy release can be replaced by an earlier known-good artifact |
+| 5. AI assistant | 1 Dec | Sanitized log analysis, structured summaries, release notes, saved reports | A failed deployment shows a useful AI explanation without controlling operations |
+| 6. DevOps delivery | 2 Dec | Dockerization, CI for ReleaseGuard, test automation, Trivy, VPS deploy, backups, monitoring | The platform is deployed and the end-to-end demo is repeatable |
 
 ---
 

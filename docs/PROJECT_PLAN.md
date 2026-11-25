@@ -3,9 +3,9 @@
 | Item | Value |
 |---|---|
 | Team | 1 full-stack developer (owns frontend, backend, DevOps and AI) |
-| Duration | 12 weeks = 6 sprints × 2 weeks |
+| Duration | 7 days (Thu 26 Nov – Wed 2 Dec 2026), 6 sprints of 1–2 days each (compressed on 25 Nov 2026; was 12 weeks) |
 | Planned start | Sun 22 Nov 2026, Sprint 0 (shift all dates if the start changes) |
-| Target finish | Fri 19 Feb 2027, MVP `v1.0.0` + live demo (moved one week on 24 Nov 2026; see the note under §3) |
+| Target finish | Wed 2 Dec 2026, MVP `v1.0.0` + live demo (was Fri 19 Feb 2027; compressed on 25 Nov 2026, see the note under §3) |
 | Spec | [ReleaseGuard_Project_Specification.pdf](../ReleaseGuard_Project_Specification.pdf) |
 | Team reference | [DEVELOPMENT_LIFECYCLE.md](DEVELOPMENT_LIFECYCLE.md) (architecture, stack, data model, process) |
 
@@ -50,53 +50,52 @@ Kubernetes target · canary and blue-green · email and chat notifications · re
 
 ```mermaid
 gantt
-    title ReleaseGuard - 12-week solo plan
+    title ReleaseGuard - 7-day solo plan (compressed 25 Nov 2026)
     dateFormat  YYYY-MM-DD
-    excludes    weekends
 
     section Setup
-    Sprint 0 - repos, GitHub App, tooling, ADRs :s0, 2026-11-22, 2026-11-26
+    Sprint 0 - repos, GitHub App, tooling, ADRs :s0, 2026-11-22, 2026-11-25
 
     section S1 Foundation
-    Backend skeleton, DB, sessions, RBAC, CSRF :s1a, 2026-11-26, 5d
-    App & environment CRUD (API + UI)          :s1b, after s1a, 4d
-    Frontend shell, CI lint/test               :s1c, after s1b, 3d
-    M1 Sign in + configure app                 :milestone, m1, 2026-12-11, 0d
+    Backend skeleton, DB, sessions, RBAC, CSRF :s1a, 2026-11-26, 1d
+    App & environment CRUD (API + UI)          :s1b, after s1a, 1d
+    Frontend shell, CI lint/test               :s1c, 2026-11-27, 1d
+    M1 Sign in + configure app                 :milestone, m1, 2026-11-27, 0d
 
     section S2 Releases
-    TaskFlow app + ci.yml (OIDC) + deploy.yml  :s2a, 2026-12-14, 3d
-    Worker, jobs table, GitHub App, dispatch   :s2b, after s2a, 3d
-    Webhooks, state machine, reconcile, UI     :s2c, after s2b, 4d
-    M2 Real CI run creates and deploys release :milestone, m2, 2026-12-25, 0d
+    TaskFlow app + ci.yml (OIDC) + deploy.yml  :s2a, 2026-11-28, 1d
+    Worker, jobs table, GitHub App, dispatch   :s2b, 2026-11-28, 1d
+    Webhooks, state machine, reconcile, UI     :s2c, 2026-11-28, 1d
+    M2 Real CI run creates and deploys release :milestone, m2, 2026-11-28, 0d
 
     section S3 Approvals
-    Policy, approval service, expiry, stale    :s3a, 2026-12-28, 4d
-    Idempotency, cancel, prod protection       :s3b, after s3a, 2d
-    Approvals inbox, policy form, audit UI     :s3c, after s3b, 4d
-    M3 Production gated by approval            :milestone, m3, 2027-01-08, 0d
+    Policy, approval service, expiry, stale    :s3a, 2026-11-29, 1d
+    Idempotency, cancel, prod protection       :s3b, 2026-11-29, 1d
+    Approvals inbox, policy form, audit UI     :s3c, 2026-11-29, 1d
+    M3 Production gated by approval            :milestone, m3, 2026-11-29, 0d
 
     section S4 Health & rollback
-    SSRF guard, scheduled checks, verification :s4a, 2027-01-11, 4d
-    Rollback service (same deploy.yml)         :s4b, after s4a, 3d
-    Env health UI, version comparison          :s4c, after s4b, 3d
-    M4 Unhealthy release rolled back           :milestone, m4, 2027-01-22, 0d
+    SSRF guard, scheduled checks, verification :s4a, 2026-11-30, 1d
+    Rollback service (same deploy.yml)         :s4b, 2026-11-30, 1d
+    Env health UI, version comparison          :s4c, 2026-11-30, 1d
+    M4 Unhealthy release rolled back           :milestone, m4, 2026-11-30, 0d
 
     section S5 AI
-    AIService + sanitizer + schema             :s5a, 2027-01-25, 4d
-    Failure analysis + release notes jobs      :s5b, after s5a, 3d
-    AI analysis UI + fallback                  :s5c, after s5b, 3d
-    M5 Useful AI explanation                   :milestone, m5, 2027-02-05, 0d
+    AIService + sanitizer + schema             :s5a, 2026-12-01, 1d
+    Failure analysis + release notes jobs      :s5b, 2026-12-01, 1d
+    AI analysis UI + fallback                  :s5c, 2026-12-01, 1d
+    M5 Useful AI explanation                   :milestone, m5, 2026-12-01, 0d
 
     section S6 Delivery
-    Prod images, CI/CD, Trivy                  :s6a, 2027-02-08, 3d
-    VPS deploy, Caddy same-origin, backups     :s6b, after s6a, 3d
-    Playwright E2E, dashboard, filters, demo   :s6c, after s6b, 4d
-    M6 v1.0.0 live + repeatable demo           :milestone, m6, 2027-02-19, 0d
+    Prod images, CI/CD, Trivy                  :s6a, 2026-12-02, 1d
+    VPS deploy, Caddy same-origin, backups     :s6b, 2026-12-02, 1d
+    Playwright E2E, dashboard, filters, demo   :s6c, 2026-12-02, 1d
+    M6 v1.0.0 live + repeatable demo           :milestone, m6, 2026-12-02, 0d
 ```
 
-> **Schedule change (24 Nov 2026):** Sprint 0 ran over and was extended to Wed 25 Nov. Sprint 1 starts Thu 26 Nov and ends Fri 11 Dec, and every later sprint moved one week (Monday starts), so the MVP date is now Fri 19 Feb 2027. Sprints 1–6 were planned in Jira up front the same day (Epics SCRUM-12…17, Tasks SCRUM-18…109, board sprints with these dates). Structural changes from the checklist: the `health_checks` migration is part of SCRUM-68, "never change the original failed deployment" is part of SCRUM-71, "status vs. health visually distinct" is part of SCRUM-74, and `compare_deployment_failures` is its own `p2` Task (SCRUM-85).
+> **Schedule change (24 Nov 2026, superseded by the 25 Nov compression below):** Sprint 0 ran over and was extended to Wed 25 Nov. Sprints 1–6 were planned in Jira up front the same day (Epics SCRUM-12…17, Tasks SCRUM-18…109, board sprints with these dates). Structural changes from the checklist: the `health_checks` migration is part of SCRUM-68, "never change the original failed deployment" is part of SCRUM-71, "status vs. health visually distinct" is part of SCRUM-74, and `compare_deployment_failures` is its own `p2` Task (SCRUM-85).
 
-> **Holidays:** Sprint 2 (14–25 Dec) ends on Christmas Day, and Sprint 3 (28 Dec – 8 Jan) includes New Year's Day. Whether to take more time off is still open. If you take time off, move every later date by the same amount rather than squeezing scope. Use the [cut list](#6-buffer-risks-and-cut-list) if the end date is fixed.
+> **Schedule compression (25 Nov 2026):** the whole project must finish within 7 days, so the MVP moved from Fri 19 Feb 2027 to **Wed 2 Dec 2026**. All scope is kept (Epics SCRUM-12…17, Tasks SCRUM-18…109), so Sprints 2–6 now last one calendar day each (weekend included) and Sprint 1 ends Fri 27 Nov. **At the plan's own sizing (≤ 2 days per Task) this is not achievable:** about 60 working days of planned work must fit in about 7 days. Treat the [cut list](#6-buffer-risks-and-cut-list) as the first resort, not the last, and never cut the "never cut" items. There are no holidays in the window.
 
 > **Design revision (23 Nov 2026):** the checklists below follow the reviewed architecture ([ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md), ADRs 0001–0007). The main changes: the worker and jobs table move to **S2** (staging dispatch needs them), TaskFlow has **one `deploy.yml`** (S4 needs no rollback workflow), approvals live on the deployment (no `approval_requests` or `rollback_events` tables), and releases register through **GitHub OIDC**.
 
@@ -104,9 +103,9 @@ gantt
 
 ## 4. Sprint breakdown
 
-Each sprint has about **8.5 working days of planned work and 1.5 days of buffer**. Every sprint ends with a tagged release (`v0.N.0`), a 10-minute self-demo recording or notes, and a short retro note in `docs/retros/`.
+Each sprint was sized at about **8.5 working days of planned work and 1.5 days of buffer**; after the 25 Nov compression each runs 1–2 calendar days (see the note in §3), so the buffer is gone and the cut list applies. Every sprint ends with a tagged release (`v0.N.0`), a 10-minute self-demo recording or notes, and a short retro note in `docs/retros/`.
 
-### Sprint 0: Setup (Sun 22 – Wed 25 Nov 2026, extended; closed Tue 24 Nov) · Epic SCRUM-5 ✓
+### Sprint 0: Setup (Sun 22 – Tue 24 Nov 2026, extended; closed Tue 24 Nov) · Epic SCRUM-5 ✓
 - [x] SCRUM-6 Create the `releaseguard` repo (monorepo layout per [section 5.6 of the guide](DEVELOPMENT_LIFECYCLE.md#56-repository-layout)) and a separate `taskflow` repo
 - [x] SCRUM-7 Protect `main` (ruleset `protect-main`, [infra/README.md](../infra/README.md#github-repository-settings)), add PR template, labels, and the Jira `SCRUM` board with the Sprint 0 Epic (the Epics, Tasks and board sprints for Sprints 1–6 are then created up front in one pass; see [§5](#5-work-tracking))
 - [x] SCRUM-8 Register a **development GitHub App** (Actions: read/write, Contents: read, Metadata: read; webhook event `workflow_run` only). Steps: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)
@@ -116,7 +115,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 1: Foundation (Thu 26 Nov – Fri 11 Dec) → `v0.1.0` · Epic SCRUM-12
+### Sprint 1: Foundation (Thu 26 – Fri 27 Nov 2026) → `v0.1.0` · Epic SCRUM-12
 **Goal:** a user can sign in, create an application and configure its three environments.
 
 **Backend**
@@ -148,7 +147,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 2: Releases and tracking (Mon 14 – Fri 25 Dec) → `v0.2.0` · Epic SCRUM-13
+### Sprint 2: Releases and tracking (Sat 28 Nov 2026) → `v0.2.0` · Epic SCRUM-13
 **Goal:** a real CI run in the TaskFlow repo registers a release, ReleaseGuard deploys it to dev automatically and to staging on request, and both deployments are tracked live.
 
 **TaskFlow (sample app repo)**
@@ -182,7 +181,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 3: Approval engine (Mon 28 Dec – Fri 8 Jan) → `v0.3.0` · Epic SCRUM-14
+### Sprint 3: Approval engine (Sun 29 Nov 2026) → `v0.3.0` · Epic SCRUM-14
 **Goal:** a production deployment **cannot** proceed without the required approval.
 
 **Backend**
@@ -215,7 +214,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 4: Health and rollback (Mon 11 – Fri 22 Jan) → `v0.4.0` · Epic SCRUM-15
+### Sprint 4: Health and rollback (Mon 30 Nov 2026) → `v0.4.0` · Epic SCRUM-15
 **Goal:** a failed or unhealthy release can be replaced by an earlier known-good artifact.
 
 **Worker**
@@ -243,7 +242,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 5: AI assistant (Mon 25 Jan – Fri 5 Feb) → `v0.5.0` · Epic SCRUM-16
+### Sprint 5: AI assistant (Tue 1 Dec 2026) → `v0.5.0` · Epic SCRUM-16
 **Goal:** a failed deployment shows a useful AI explanation without controlling any operations.
 
 **Backend and worker**
@@ -271,7 +270,7 @@ Each sprint has about **8.5 working days of planned work and 1.5 days of buffer*
 
 ---
 
-### Sprint 6: DevOps delivery and polish (Mon 8 – Fri 19 Feb 2027) → `v1.0.0` · Epic SCRUM-17
+### Sprint 6: DevOps delivery and polish (Wed 2 Dec 2026) → `v1.0.0` · Epic SCRUM-17
 **Goal:** the platform is deployed and the end-to-end demo can be repeated.
 
 **DevOps**
@@ -340,25 +339,25 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 | Once, before Sprint 1 | Up-front planning: review and approve every sprint's Tasks, then Claude creates them in Jira | 1–2 h |
 | Daily (first session) | Claude picks today's Tasks (`today` label) and updates the "Today" block; you confirm or swap | 5 min |
 | Per Task | Start it in plan mode, approve the plan, build; Claude marks it Done when `/dod-check` passes | — |
-| Mid-sprint (Wed, week 2) | Scope check: on track? If not, apply the cut list early | 15 min |
-| Sprint end | Claude closes the sprint when its last Task is Done; you demo to yourself (record it), tag `v0.N.0`, review the retro draft | 1 h |
+| Mid-sprint (midday of each sprint day) | Scope check: on track? If not, apply the cut list now | 5 min |
+| Sprint end | Claude closes the sprint when its last Task is Done; you demo to yourself (record it), tag `v0.N.0`, review the retro draft | 15–30 min |
 
 ---
 
 ## 6. Buffer, risks and cut list
 
 ### Buffer
-About 1.5 days per sprint (~15%). Unused buffer goes to tests and docs, **not** to new features.
+None after the 25 Nov compression (the original plan had about 1.5 days per sprint, ~15%). The cut list is the only buffer. Any time left over goes to tests and docs, **not** to new features.
 
 ### Top delivery risks
 | Risk | Early signal | Response |
 |---|---|---|
-| GitHub App and webhook setup takes longer than planned | S2 day 4 with no release registered | Release registration (OIDC) doesn't depend on webhooks; until webhooks work, the reconcile sweep reads run status from the API |
-| S2 is the heaviest sprint (worker, GitHub App, OIDC, webhooks, state machine) | S2 day 5 with no run dispatched | Move manual `POST /releases` and the GitHub integration settings page to S3; keep the dispatch → webhook → timeline path |
-| Deploy target for TaskFlow is unclear | S2 day 2 | Use the same VPS with separate compose projects per environment (`taskflow-dev/staging/prod`) |
-| Holiday weeks (end of S2, S3) | Before 14 Dec (S2 start) | Move dates; don't compress approval-engine work |
-| AI output quality is poor | S5 day 5 | Narrow the input to the failed step's excerpt; add few-shot examples; keep the schema strict |
-| VPS and TLS problems | S6 day 3 | Fall back to the provider's default domain; Caddy handles certificates |
+| GitHub App and webhook setup takes longer than planned | S2 (Sat 28 Nov) evening with no release registered | Release registration (OIDC) doesn't depend on webhooks; until webhooks work, the reconcile sweep reads run status from the API |
+| S2 is the heaviest sprint (worker, GitHub App, OIDC, webhooks, state machine) | S2 (Sat 28 Nov) end with no run dispatched | Move manual `POST /releases` and the GitHub integration settings page to S3; keep the dispatch → webhook → timeline path |
+| Deploy target for TaskFlow is unclear | S2 (Sat 28 Nov) morning | Use the same VPS with separate compose projects per environment (`taskflow-dev/staging/prod`) |
+| 7-day schedule is ~9x faster than the sized plan | Any sprint still open at the end of its day | Apply the cut list immediately; don't compress approval-engine work |
+| AI output quality is poor | S5 (Tue 1 Dec) afternoon | Narrow the input to the failed step's excerpt; add few-shot examples; keep the schema strict |
+| VPS and TLS problems | S6 (Wed 2 Dec) midday | Fall back to the provider's default domain; Caddy handles certificates |
 
 ### Cut list (apply in this order if the schedule slips)
 1. `compare_deployment_failures()`: historical AI comparison
