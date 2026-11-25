@@ -29,5 +29,14 @@ paths:
 - Show approver identity and timestamp wherever an approval appears. Label AI probable causes **"AI-generated hypothesis"**.
 - Store timestamps in UTC and render them in the user's local time.
 
+## Stack notes (Next.js 16.4, SCRUM-26)
+- **Cache Components and Partial Prefetching are on** (`next.config.ts`). Read the matching guide in `frontend/node_modules/next/dist/docs/` before using a Next.js API (see `frontend/AGENTS.md`); this is also the fallback when context7 isn't available.
+- Pages that need the app shell go under the `app/(app)/` route group. The root layout stays bare (for `/login`). Unknown URLs hit `app/(app)/[...slug]`, which calls `notFound()`, so a 404 renders inside the shell.
+- shadcn/ui uses the Radix base with the Nova preset, a slate palette and `cn` from the `cn` package. Dark mode follows the OS (`prefers-color-scheme`). Add primitives with `pnpm dlx shadcn@latest add <name>`, then run `pnpm lint`: generated code must pass the React Compiler rules (`use-mobile.ts` had to be rewritten).
+- Sidebar items come from `lib/navigation.ts`. The only public env var is read in `lib/env.ts`.
+
 ## Quality
-- `pnpm eslint .`, `pnpm tsc --noEmit` and `pnpm build` must pass. No `any` in API-facing code.
+- `pnpm lint`, `pnpm typecheck` (runs `next typegen`, then `tsc --noEmit`, so `LayoutProps` exists on a fresh clone) and `pnpm build` must pass. `pnpm format:check` must be clean. No `any` in API-facing code.
+
+## Lessons learned
+- **On Windows, run a Node tool's JS entry with `node`, never its `node_modules/.bin/*.cmd` shim, when the arguments include file paths.** Why: the shim goes through `cmd.exe`, which breaks on `(` and `)` in route-group paths such as `app/(app)/…`. (2026-11-25, SCRUM-26)

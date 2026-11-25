@@ -68,11 +68,14 @@ def main() -> None:
         report(run(["uv", "run", "--quiet", "ruff", "check", "--fix", target], backend), "ruff")
 
     elif rel.parts[0] == "frontend" and path.suffix in {".ts", ".tsx", ".js", ".jsx"}:
-        bin_dir = frontend / "node_modules" / ".bin"
-        eslint = bin_dir / ("eslint.cmd" if os.name == "nt" else "eslint")
-        if not eslint.exists():
+        # Run eslint's JS entry with node directly. The Windows `.bin/eslint.cmd` shim goes
+        # through cmd.exe, which breaks on paths with parentheses (route groups: app/(app)/…).
+        eslint = frontend / "node_modules" / "eslint" / "bin" / "eslint.js"
+        node = shutil.which("node")
+        if not eslint.exists() or not node:
             return
-        report(run([str(eslint), "--fix", str(path.relative_to(frontend))], frontend), "eslint")
+        target = str(path.relative_to(frontend))
+        report(run([node, str(eslint), "--fix", target], frontend), "eslint")
 
 
 if __name__ == "__main__":
