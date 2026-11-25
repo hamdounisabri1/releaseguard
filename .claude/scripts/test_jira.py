@@ -137,6 +137,12 @@ def test_missing_env_is_an_error_not_a_crash(monkeypatch: pytest.MonkeyPatch, ca
     assert "missing env vars" in capsys.readouterr().err
 
 
+def test_no_comment_file_option() -> None:
+    # A file option would let the script post local files (e.g. .env) to Jira.
+    with pytest.raises(SystemExit):
+        jira.build_parser().parse_args(["start", "SCRUM-27", "--comment-file", ".env"])
+
+
 def test_secrets_never_printed(fake: FakeJira, capsys: Any) -> None:
     fake.fail = {"SCRUM-27"}
     jira.main(["start", "SCRUM-27"])

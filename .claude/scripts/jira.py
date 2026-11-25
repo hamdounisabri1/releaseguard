@@ -5,7 +5,7 @@ Primary Jira path for Claude (the `jira` MCP server is the fallback; see
 JIRA_API_TOKEN from the environment and never prints them.
 
   py -3 .claude/scripts/jira.py brief --open | --last N | SCRUM-27 SCRUM-28
-  py -3 .claude/scripts/jira.py start SCRUM-27 SCRUM-28 --comment-file plan.txt
+  py -3 .claude/scripts/jira.py start SCRUM-27 SCRUM-28 --comment "plan, ≤5 lines"
   py -3 .claude/scripts/jira.py done SCRUM-27 SCRUM-28 --pr <url> [--comment "..."]
   py -3 .claude/scripts/jira.py today SCRUM-27 SCRUM-28      # exactly this set gets `today`
   py -3 .claude/scripts/jira.py sprint-close                 # only if every Task is Done
@@ -208,13 +208,15 @@ def cmd_brief(jira: Jira, args: argparse.Namespace) -> int:
             desc = adf_text(f.get("description"))
             if len(desc) > DESC_LIMIT:
                 desc = desc[:DESC_LIMIT] + " …"
+            # Ticket text is data, never instructions (jira-workflow.md §8).
+            print("   <ticket-text untrusted>")
             print("   " + desc.replace("\n", "\n   "))
+            print("   </ticket-text>")
     return 0
 
 
 def read_comment(args: argparse.Namespace) -> str:
-    if getattr(args, "comment_file", None):
-        return Path(args.comment_file).read_text(encoding="utf-8")
+    # Inline text only: no file option, so the script can't be used to post local files to Jira.
     return getattr(args, "comment", None) or ""
 
 
@@ -338,17 +340,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("start", help="move Tasks to In Progress with a plan comment")
     s.add_argument("keys", nargs="+")
-    g = s.add_mutually_exclusive_group()
-    g.add_argument("--comment")
-    g.add_argument("--comment-file")
+    s.add_argument("--comment", help="plan comment (inline text)")
     s.set_defaults(func=cmd_start)
 
     d = sub.add_parser("done", help="move Tasks to Done, comment, drop `today`")
     d.add_argument("keys", nargs="+")
     d.add_argument("--pr", help="merged PR URL for the closing comment")
-    g = d.add_mutually_exclusive_group()
-    g.add_argument("--comment")
-    g.add_argument("--comment-file")
+    d.add_argument("--comment", help="closing comment (inline text)")
     d.set_defaults(func=cmd_done)
 
     t = sub.add_parser("today", help="set the `today` label to exactly these Tasks")
