@@ -1,0 +1,51 @@
+# Local gates that run before every commit (SCRUM-10).
+#   Install once per clone:  uv tool install pre-commit  &&  pre-commit install
+#   Run on everything:       pre-commit run --all-files
+#   Update the pinned revs:  pre-commit autoupdate --freeze
+# Every hook runs only on matching staged files, so the backend/, worker/ and
+# frontend/ hooks skip cleanly until those folders contain code.
+# Keep the Ruff rev equal to the ruff version pinned in backend/pyproject.toml (Sprint 1).
+
+repos:
+  # Secrets: blocks a commit whose staged changes contain a credential.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 2ca41cc1372d1e939a6a879f18cdc19fc1cac1ce  # frozen: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-yaml
+      - id: check-json
+
+  # Python: backend, worker and infra scripts.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 9026c9127e153371d7a78dfcb0c45ae2046a3d10  # frozen: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^(backend|worker|infra)/
+      - id: ruff-format
+        files: ^(backend|worker|infra)/
+
+  # Frontend: uses the versions and config installed in frontend/ (pnpm install there first).
+  # Lints the whole frontend project, so paths need no rewriting on Windows.
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        language: system
+        entry: pnpm --dir frontend exec eslint --fix --max-warnings=0 .
+        files: ^frontend/.*\.(js|jsx|ts|tsx|mjs|cjs)$
+        pass_filenames: false
+      - id: prettier
+        name: prettier (frontend)
+        language: system
+        entry: pnpm --dir frontend exec prettier --write --ignore-unknown .
+        files: ^frontend/.*\.(js|jsx|ts|tsx|mjs|cjs|css|json)$
+        pass_filenames: false

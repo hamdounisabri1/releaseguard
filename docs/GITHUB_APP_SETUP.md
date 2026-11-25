@@ -116,7 +116,7 @@ Use forward slashes in the path. Close the terminal from step 2.
 
    Any extra key in `permissions` or `events` fails the check: edit the App (**Permissions & events**) and remove it.
 2. **Installation scope:** <https://github.com/settings/installations> → **Configure** next to the App shows **Only select repositories: `taskflow`**.
-3. **Nothing leaked into the repo:** `git status` is clean apart from intended changes, `git ls-files '*.pem'` prints nothing, and gitleaks finds nothing once it is installed (SCRUM-10).
+3. **Nothing leaked into the repo:** `git status` is clean apart from intended changes, `git ls-files '*.pem'` prints nothing, and the pre-commit gitleaks hook passes on every commit. For a full-history scan on demand, use a gitleaks binary: `gitleaks git --redact .`.
 4. **Webhook reaches your machine:** follow [Run the webhook tunnel → Verify](#verify-a-real-delivery). Note that **Recent deliveries** shows a green tick (smee.io answered 200) whether or not anything on your machine received the event; only the receiver's log proves it arrived.
 
 ## Run the webhook tunnel

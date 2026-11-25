@@ -1,8 +1,9 @@
 """PreToolUse hook for Bash and PowerShell commands.
 
 1. Blocks commands that read secret files (.env, *.pem, *.key). .env.example is allowed.
-2. On `git commit`, runs gitleaks on the staged changes once gitleaks is installed.
-   Until then it does nothing (pre-code safe).
+2. On `git commit`, runs gitleaks on the staged changes if a gitleaks binary is on PATH.
+   Otherwise it does nothing here; the pre-commit gitleaks hook (.pre-commit-config.yaml)
+   still scans every commit.
 
 Exit code 2 blocks the tool call and shows stderr to Claude.
 """
