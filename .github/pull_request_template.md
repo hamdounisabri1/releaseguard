@@ -1,5 +1,6 @@
 <!--
-PR title = Conventional Commit with the Jira key; it becomes the squash commit on main.
+PR title = Conventional Commit with the Jira key. PRs are rebase-merged, so every commit
+lands on main as is: each one needs its own Conventional Commit message with the key.
   feat(api): SCRUM-12 block self-approval when policy enabled
 Scopes: api · web · worker · db · github · ai · infra · docs
 -->

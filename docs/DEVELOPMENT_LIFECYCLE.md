@@ -1022,10 +1022,10 @@ flowchart LR
 The team works in **vertical slices**. Each sprint ends with something working that can be demoed, not a pile of models or screens. See [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ### 14.2 Branching, commits and versioning
-- **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required). Both repos use the ruleset `protect-main` (PR required, squash-merge only, no force-push or deletion, no bypass), applied by [`infra/github/setup-repo.sh`](../infra/README.md#github-repository-settings). Required status checks are added in Sprint 1, once CI exists.
+- **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required). Both repos use the ruleset `protect-main` (PR required, rebase-merge only, no force-push or deletion, no bypass), applied by [`infra/github/setup-repo.sh`](../infra/README.md#github-repository-settings). Required status checks are added in Sprint 1, once CI exists.
 - Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge the same day.
 - **Conventional Commits:** `feat(api): block self-approval when policy enabled`. Scopes: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra`, `docs`.
-- **Squash-merge** PRs so `main` has one commit per change.
+- **Rebase-merge** PRs so `main` keeps every commit (linear history, no merge commits). Each commit is a Conventional Commit with the Jira key that builds and passes on its own; fixups are folded in with `--autosquash` before review.
 - **SemVer tags** for ReleaseGuard releases (`v0.1.0` at the end of Sprint 1, … `v1.0.0` at MVP). Generate the changelog from the commits.
 - Record significant technical decisions as **ADRs** in `docs/adr/NNNN-title.md` (context, decision, alternatives, consequences) with `/new-adr`. Accepted so far: [0001](adr/0001-modular-monolith.md) modular monolith · [0002](adr/0002-deploy-by-image-digest.md) deploy by digest · [0003](adr/0003-deployment-aggregate.md) deployment aggregate · [0004](adr/0004-postgres-jobs-table.md) jobs table · [0005](adr/0005-single-deploy-workflow.md) one deploy workflow · [0006](adr/0006-release-registration-via-oidc.md) OIDC release registration · [0007](adr/0007-server-side-sessions-and-csrf.md) sessions and CSRF.
 
