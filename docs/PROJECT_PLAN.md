@@ -137,7 +137,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 ---
 
-### Sprint 1: Foundation (Thu 26 – Fri 27 Nov 2026, 09:00–20:00 · 16.5 h planned of 20 h) → `v0.1.0` · Epic SCRUM-12
+### Sprint 1: Foundation (Thu 26 – Fri 27 Nov 2026, 09:00–20:00 · 18 h planned of 20 h) → `v0.1.0` · Epic SCRUM-12
 **Goal:** a user can sign in, create an application and configure its three environments.
 
 **Backend**
@@ -149,6 +149,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [x] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
 - [x] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
 - [x] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
+- [ ] SCRUM-110 *(1.5 h)* Login throttling (found in SCRUM-20): `login_attempts` table, 5 failures per (email, IP) and 30 per IP in 15 min → 429 `too_many_attempts` + `Retry-After`; unknown emails throttled the same; `X-Forwarded-For` trusted only from Caddy
 
 **Frontend**
 - [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
@@ -340,12 +341,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Wed 25 Nov 2026
-- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (this PR): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping · SCRUM-23 application + environment CRUD · SCRUM-25 seed script
+- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (PR #14): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping · SCRUM-23 application + environment CRUD · SCRUM-25 seed script
 - **Today's Tasks:** bulk SCRUM-19…25 (Thu's 09:00–17:30 backend blocks, started a day early; one PR). SCRUM-22/23 lines corrected to match Jira (22 = audit helper, 23 = CRUD)
 - **Carried over:** none
 - **Blocked:** none
-- **Next:** after the bulk PR merges: SCRUM-27, 28 (API client, login page; see the [timetable](#daily-timetable))
-- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 8 h left of 20 h (SCRUM-26 and the 7.5 h SCRUM-19…25 bulk done a day early, pending merge)
+- **Next:** SCRUM-110 (login throttling, added from the SCRUM-20 review), then SCRUM-27, 28 (API client, login page; see the [timetable](#daily-timetable))
+- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 9.5 h left of 20 h (SCRUM-26 and the 7.5 h SCRUM-19…25 bulk done a day early, merged in PR #14; SCRUM-110 adds 1.5 h)
 
 ### Labels
 | Group | Labels |
