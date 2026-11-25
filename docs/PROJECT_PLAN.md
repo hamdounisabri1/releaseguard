@@ -146,7 +146,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [x] SCRUM-20 *(1.5 h)* Auth: argon2id, server-side sessions (hashed id, idle and absolute timeout, rotate on login), `HttpOnly`/`Secure`/`SameSite=Lax` cookie, login, logout and `me`
 - [x] SCRUM-21 *(1 h)* RBAC dependency: `require_role(Role.ADMIN, …)` plus workspace scoping on every query
 - [x] SCRUM-22 *(30 min)* Audit log helper, `record_audit(actor, action, target, details)`, used by every state-changing service
-- [ ] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
+- [x] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
 - [x] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
 - [ ] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
 
@@ -340,7 +340,7 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Wed 25 Nov 2026
-- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (this PR): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping
+- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (this PR): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping · SCRUM-23 application + environment CRUD
 - **Today's Tasks:** bulk SCRUM-19…25 (Thu's 09:00–17:30 backend blocks, started a day early; one PR). SCRUM-22/23 lines corrected to match Jira (22 = audit helper, 23 = CRUD)
 - **Carried over:** none
 - **Blocked:** none

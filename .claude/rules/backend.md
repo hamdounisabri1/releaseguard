@@ -32,7 +32,9 @@ paths:
 - The dispatch job calls the GitHub dispatch API with `return_run_details`, stores `workflow_run_id` and URL, and moves `queued → deploying`. After `max_attempts` its failure hook moves `queued → failed` (`dispatch_failed`).
 
 ## API conventions
-- Prefix `/api/v1`, JSON only, paginated lists.
+- Prefix `/api/v1`, JSON only, paginated lists: `page` (from 1) and `page_size` (≤ 100) in, `Page[T]` (`app/schemas/common.py`: `items`, `total`, `page`, `page_size`) out.
+- Request bodies use `extra="forbid"`, so unknown fields (or ones not editable yet) are a 422. PATCH bodies change only the fields sent (`model_dump(exclude_unset=True)`); audit entries record `{"changes": {field: {"from", "to"}}}` and are skipped when nothing changed.
+- Map a unique-constraint `IntegrityError` to a named 409 by catching it around a `db.begin_nested()` savepoint and matching the constraint name; re-raise anything else.
 - Error shape: `{"error": {"code", "message", "details"}}`. Use 403 for a role failure, 404 for another workspace's resource, 409 for an invalid state or lock conflict, 422 for validation.
 - A 422 returns each error's `msg` as is, so **custom Pydantic validators never put the submitted value in their message** (`raise ValueError("must be a bare origin")`, not `f"{value} is invalid"`): it may be a password or token.
 - `/healthz` (liveness) and `/readyz` (DB reachable) are public.

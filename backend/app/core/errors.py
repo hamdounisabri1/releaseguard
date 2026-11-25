@@ -62,6 +62,14 @@ class ConflictError(AppError):
     message = "The request conflicts with the current state."
 
 
+class UnprocessableError(AppError):
+    """Well-formed input that breaks a domain rule (e.g. a policy pointing at the wrong place)."""
+
+    status_code = HTTPStatus.UNPROCESSABLE_ENTITY
+    code = "unprocessable"
+    message = "The request breaks a domain rule."
+
+
 class ServiceUnavailableError(AppError):
     status_code = HTTPStatus.SERVICE_UNAVAILABLE
     code = "not_ready"
