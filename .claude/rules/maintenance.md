@@ -7,7 +7,7 @@ Follow the checklist in [docs/AI_TOOLING.md § Adding a new tool](../../docs/AI_
 
 ## 2. Keep the `.md` files current
 Use the "Keep the docs in sync" table in `CLAUDE.md` to find the file, and update it **in the same change**. Beyond that table:
-- A finished sprint task: tick its checkbox in `docs/PROJECT_PLAN.md` **in the Task's own PR, before merge** (`main` is protected, so a tick made after the merge has nowhere to go).
+- A finished sprint task: tick its checkbox in `docs/PROJECT_PLAN.md` **in the Task's own PR (or the shared PR of a bulk completion), before merge** (`main` is protected, so a tick made after the merge has nowhere to go).
 - A doc that contradicts the code: fix the doc (or the code). Never leave the two disagreeing.
 - When ending a session that produced new knowledge, offer `/claude-md-management:revise-claude-md`.
 - **Project knowledge lives in the repo, never in Claude's personal memory.** Every rule, convention, process decision or project fact goes into `CLAUDE.md`, `.claude/rules/` or `docs/`, so it is versioned and visible on GitHub. Personal memory is only for things that have nothing to do with this project.
