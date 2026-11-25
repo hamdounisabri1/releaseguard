@@ -45,8 +45,8 @@ The full checklist is in the [project plan](docs/PROJECT_PLAN.md). Work is track
 ## Repository layout
 
 ```text
-backend/        FastAPI API + shared worker code (Sprint 1)
-frontend/       Next.js web UI (Sprint 1)
+backend/        FastAPI API + shared worker code
+frontend/       Next.js web UI (App Router, shadcn/ui)
 worker/         Worker entrypoint and container (Sprint 2)
 infra/          Docker Compose, Caddy reverse proxy, backup/restore scripts
 .claude/        Claude Code config: rules, skills, hooks, agents, commands
@@ -57,11 +57,11 @@ CLAUDE.md       Instructions for Claude Code
 .mcp.json       Project MCP servers (Jira)
 ```
 
-`backend/`, `frontend/`, `worker/` and `infra/` hold README placeholders that describe their planned layout ([guide §5.6](docs/DEVELOPMENT_LIFECYCLE.md#56-repository-layout)). The sample app **TaskFlow** lives in a separate repository: [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow).
+`backend/` (skeleton, SCRUM-18) and `frontend/` (app shell, SCRUM-26) hold code; `worker/` and `infra/` hold README placeholders that describe their planned layout ([guide §5.6](docs/DEVELOPMENT_LIFECYCLE.md#56-repository-layout)). The sample app **TaskFlow** lives in a separate repository: [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow).
 
 ## Getting started
 
-There is nothing to run yet. To work on the project with Claude Code, follow [Setup after cloning](docs/AI_TOOLING.md#setup-after-cloning): it covers the prerequisites, plugins, and the GitHub and Jira tokens (kept in your OS environment, never in the repo). Local development commands are listed in [CLAUDE.md](CLAUDE.md) and will be verified once the Sprint 1 scaffolding exists.
+The backend skeleton and the frontend shell run locally (commands in [CLAUDE.md](CLAUDE.md#commands)). To work on the project with Claude Code, follow [Setup after cloning](docs/AI_TOOLING.md#setup-after-cloning): it covers the prerequisites, plugins, and the GitHub and Jira tokens (kept in your OS environment, never in the repo). Commands still marked `(planned)` there are verified as their Tasks land.
 
 ## Built with Claude Code
 

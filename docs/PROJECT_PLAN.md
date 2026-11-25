@@ -151,7 +151,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [ ] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
 
 **Frontend**
-- [ ] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
+- [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
 - [ ] SCRUM-27 *(1 h)* API client in `services/`, types generated from OpenAPI (`openapi-typescript`), TanStack Query
 - [ ] SCRUM-28 *(1 h)* Login page; auth guard; dashboard placeholder
 - [ ] SCRUM-30 *(1.5 h)* Applications list (search, create, archive) and application details with environments tab
@@ -340,12 +340,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Wed 25 Nov 2026
-- **Done today:** SCRUM-18 Backend skeleton (PR #10 merged, Done in Jira)
-- **Today's Tasks:** SCRUM-26 Next.js App Router scaffold (1 h, p0), a head start on Thu's 17:30 block. Unblocked (its only blocker, SCRUM-6, is Done)
+- **Done today:** SCRUM-18 Backend skeleton (PR #10 merged, Done in Jira) · SCRUM-26 Next.js App Router shell (sidebar, top bar, in-shell 404; this PR)
+- **Today's Tasks:** none left (SCRUM-26, the head start on Thu's 17:30 block, is done, which frees 1 h on Thu)
 - **Carried over:** none
 - **Blocked:** none
 - **Next:** Thu 26 Nov 09:00: SCRUM-19 (2 h), then SCRUM-20 and SCRUM-23 (see the [timetable](#daily-timetable))
-- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 16.5 h left of 20 h
+- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 15.5 h left of 20 h (SCRUM-26 done a day early)
 
 ### Labels
 | Group | Labels |

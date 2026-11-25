@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ReleaseGuard is a **deployment approval and rollback manager** for small teams. It is **not** a CI/CD engine. GitHub Actions builds and deploys. ReleaseGuard decides whether a release may proceed, records every decision, dispatches approved workflows, verifies health over HTTP and coordinates rollback to an earlier image **digest**.
 
-- **Status:** early build. The backend skeleton exists (`backend/`: config, error shape, Origin-check CSRF, role matrix; SCRUM-18); `frontend/`, `worker/` and `infra/` are still README placeholders. **Current sprint: 1, Foundation (Thu 26 – Fri 27 Nov 2026) → `v0.1.0`, Epic SCRUM-12 (Tasks SCRUM-18…34); board sprint active since 24 Nov. Sprint 0 closed Tue 24 Nov ([retro](docs/retros/sprint-0.md)). All sprints are planned in Jira (Epics SCRUM-12…17, Tasks SCRUM-18…109); MVP Wed 2 Dec 2026, 20:00 (re-planned in hours on 25 Nov: 09:00–20:00 daily, 10 h a day, Tasks ≤ 2 h, 63.25 h of Tasks in 70 h; follow the plan's daily timetable).** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
+- **Status:** early build. The backend skeleton exists (`backend/`: config, error shape, Origin-check CSRF, role matrix; SCRUM-18) and the frontend shell (`frontend/`: Next.js 16 App Router, shadcn/ui sidebar and top bar; SCRUM-26); `worker/` and `infra/` are still README placeholders. **Current sprint: 1, Foundation (Thu 26 – Fri 27 Nov 2026) → `v0.1.0`, Epic SCRUM-12 (Tasks SCRUM-18…34); board sprint active since 24 Nov. Sprint 0 closed Tue 24 Nov ([retro](docs/retros/sprint-0.md)). All sprints are planned in Jira (Epics SCRUM-12…17, Tasks SCRUM-18…109); MVP Wed 2 Dec 2026, 20:00 (re-planned in hours on 25 Nov: 09:00–20:00 daily, 10 h a day, Tasks ≤ 2 h, 63.25 h of Tasks in 70 h; follow the plan's daily timetable).** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
 - **Source of truth:** [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) covers architecture, data model, state machine, API, security and process. The original spec is [docs/ReleaseGuard_Project_Specification.pdf](docs/ReleaseGuard_Project_Specification.pdf).
 - **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` ([hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow), a separate, small, public sample app with two workflows: `ci.yml`, which registers each release through GitHub OIDC, and `deploy.yml`, which ReleaseGuard dispatches for every environment and for rollback). The demo depends on both.
 - **Team:** one full-stack developer. Prefer vertical slices that can be demoed at the end of each sprint over horizontal layers.
@@ -36,9 +36,12 @@ uv run pytest tests/path/test_file.py::test_name                   # single test
 uv run ruff check . && uv run ruff format --check . && uv run mypy app tests   # lint + types
 uv run alembic upgrade head && uv run alembic check                # (planned, SCRUM-19) migration gate
 
-# Frontend (Node LTS, pnpm: not installed yet, `corepack enable` or `npm i -g pnpm`)
-cd frontend && pnpm install && pnpm dev                       # http://localhost:3000
-pnpm eslint . && pnpm tsc --noEmit && pnpm build
+# Frontend (Node 22 LTS, pnpm 10 pinned in package.json: `corepack install -g pnpm@10.34.9` once; corepack can't run pnpm 12 yet)
+cd frontend && pnpm install && pnpm dev                       # http://localhost:3000 (/ redirects to /dashboard)
+pnpm lint && pnpm typecheck && pnpm build                     # typecheck = next typegen + tsc --noEmit
+pnpm format:check                                             # Prettier (pnpm format to fix)
+pnpm dlx shadcn@latest add <component>                        # new shadcn/ui primitive into components/ui/
+uv run --no-project --with pytest pytest .claude/hooks        # regression tests for the Claude Code hooks
 
 # Local GitHub webhooks (dev App → smee channel → localhost:8000); steps in docs/GITHUB_APP_SETUP.md
 py -3 infra/scripts/webhook_echo.py        # stand-in receiver until SCRUM-45 (GITHUB_WEBHOOK_SECRET in the shell env)
