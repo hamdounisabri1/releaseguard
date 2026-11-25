@@ -5,6 +5,7 @@ ReleaseGuard has authority over production releases. These rules apply to all co
 ## Authorization
 - Enforce permissions in the **backend** (FastAPI dependency plus the service layer). Hiding a button in the UI is not authorization.
 - Every query is filtered by the caller's `workspace_id`. Resources in another workspace return **404** (never confirm they exist). Use **403** for a role failure inside the caller's own workspace.
+- **How:** routes declare `Depends(require_capability(Capability.X))` (or `require_role(...)`, both in `app/api/deps.py`, derived from the one matrix in `app/core/permissions.py`); services repeat the check with `app.services.authz.ensure_can` and turn a scoped miss into 404 with `found()`. Every public function in a tenant repository takes `(db, workspace_id, …)`; `tests/test_scoping.py` fails otherwise. Only `app/repositories/identity.py` (login and session lookups) is exempt.
 - Role matrix (guide §3.1): only **Admin** manages members, the GitHub integration and environment and approval policy. **Admin/Reviewer** approve. **Admin/Developer** request deployments and rollbacks. **Viewer** is read-only.
 - Self-approval is blocked when the workspace setting `block_self_approval` is on. A reviewer can't decide twice on the same request. Stale or expired requests can't be decided.
 
