@@ -26,6 +26,8 @@ Settings come from environment variables, falling back to the repository-root `.
 | `app/core/permissions.py` | `Role`, `Capability` and the role matrix from [guide §3.1](../docs/DEVELOPMENT_LIFECYCLE.md#31-permission-matrix) |
 | `app/api/v1/router.py` | `api_router` (`/api/v1`); each area adds its own module and is included there |
 | `app/schemas/errors.py` | `ErrorResponse` for OpenAPI |
+| `app/core/logging.py`, `app/core/request_id.py` | structlog JSON logging with redaction; `RequestIdMiddleware` (`X-Request-ID` in and out, one access line per request) |
+| `app/api/health.py` | `GET /healthz` (liveness) and `GET /readyz` (`SELECT 1`; 503 `not_ready` when the database is unreachable), at the root for container health checks |
 | `app/db/` | `Base` with the constraint naming convention and `check_in()` (CHECK from an enum); engine and session factory (sync SQLAlchemy 2.0 + psycopg 3) |
 | `app/models/` | `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments`, `audit_logs`; enums mirrored by CHECK constraints; composite FKs keep children in their workspace |
 | `migrations/` | Alembic. `0001` also creates `forbid_history_mutation()` and the `audit_logs` append-only triggers (UPDATE, DELETE, TRUNCATE) |

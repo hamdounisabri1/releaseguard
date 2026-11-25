@@ -7,6 +7,7 @@ import logging
 from http import HTTPStatus
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -59,6 +60,12 @@ class ConflictError(AppError):
     status_code = HTTPStatus.CONFLICT
     code = "conflict"
     message = "The request conflicts with the current state."
+
+
+class ServiceUnavailableError(AppError):
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+    code = "not_ready"
+    message = "The service is not ready."
 
 
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -133,8 +140,14 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
         request.url.path,
         exc_info=(type(exc), exc, exc.__traceback__),
     )
+    # Starlette sends this response from outside the user middleware, so the request-ID
+    # middleware can't add its header here; add it from the log context instead.
+    request_id = structlog.contextvars.get_contextvars().get("request_id")
     return error_response(
-        HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error", "An unexpected error occurred."
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        "internal_error",
+        "An unexpected error occurred.",
+        headers={"X-Request-ID": request_id} if isinstance(request_id, str) else None,
     )
 
 

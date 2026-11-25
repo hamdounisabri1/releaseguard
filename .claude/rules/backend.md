@@ -12,6 +12,7 @@ paths:
 - **Services own the rules:** permission checks, state transitions, transactions, job enqueueing, audit entries.
 - **The API process never makes outbound network calls** (GitHub, LLM, health URLs). It writes state plus a `jobs` row in one transaction; the worker does the I/O (ADR-0001).
 - **Repositories only do data access.** Every query takes `workspace_id` (or joins to it). Repositories never commit: the **service layer owns the transaction boundary**.
+- **Database access is synchronous** SQLAlchemy 2.0 + psycopg 3 (async psycopg can't run on Windows' default event loop; sync keeps Alembic and test rollback simple). Routes and dependencies that touch the DB are plain `def` (FastAPI runs them in its threadpool); take the session with `DbSession` from `app/api/deps.py`. Worker code calls DB functions through `asyncio.to_thread`.
 - Use the Pydantic v2 and SQLAlchemy 2.0 APIs. Check current docs with context7 rather than relying on memory.
 - The `fastapi-templates` skill is fine for dependencies, error handling and async patterns, but **not** for auth or layout: it teaches JWT/OAuth2 and an `endpoints/` folder. Auth here is server-side sessions (`security.md`) and the layout is the one above.
 
@@ -50,5 +51,7 @@ paths:
 - Health: verification needs `verify_successes` consecutive passes within `verify_timeout_seconds`; `failure_threshold` consecutive failures or the timeout → `unhealthy`. Scheduled checks change only `environments.health_status`, and only after `failure_threshold` **consecutive** failures. Every health URL goes through the SSRF guard (`security.md`).
 
 ## Logging
-- `structlog` JSON with `request_id`, `workspace_id`, `user_id`, `deployment_id` and `workflow_run_id` where known. Middleware propagates `X-Request-ID`.
+- `structlog` JSON (`app/core/logging.py`) with `request_id`, `workspace_id`, `user_id`, `deployment_id` and `workflow_run_id` where known: bind them with `structlog.contextvars.bind_contextvars`, and get loggers with `app.core.logging.get_logger`. Stdlib loggers (uvicorn, SQLAlchemy) go through the same JSON formatter.
+- `RequestIdMiddleware` (outermost) reuses a plain incoming `X-Request-ID` (`[A-Za-z0-9._-]{1,64}`) or makes one, echoes it on every response and writes one access line per request: method, path (**never the query string**), status, duration.
+- Values under sensitive keys (`password`, `secret`, `token`, `cookie`, `authorization`, `api_key`, `private_key`, `credential`) are redacted by a processor, nested ones too. Still never log request bodies, headers or exception text that can carry a connection URL.
 - Store timestamps as UTC (`timestamptz`).
