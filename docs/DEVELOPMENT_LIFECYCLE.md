@@ -1074,7 +1074,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 **Seed data:** one workspace, four users (one per role), the TaskFlow application with three environments, and some example releases and deployments, so every screen has content.
 
-**Testing GitHub webhooks locally:** use a tunnel (`smee.io`, `ngrok` or `cloudflared`) pointing at `/api/v1/github/webhooks`, with a **separate development GitHub App** ([setup](GITHUB_APP_SETUP.md)).
+**Testing GitHub webhooks locally:** a **smee.io** channel forwards the **separate development GitHub App**'s deliveries to `http://127.0.0.1:8000/api/v1/github/webhooks` (`npx -y smee-client@5.0.0 --url <channel> --target …`); cloudflared is the byte-exact fallback. Start, stop, verify and Redeliver steps: [GITHUB_APP_SETUP.md § Run the webhook tunnel](GITHUB_APP_SETUP.md#run-the-webhook-tunnel). Until the real endpoint exists, `infra/scripts/webhook_echo.py` stands in for it.
 
 **Key environment variables (`.env.example`):**
 

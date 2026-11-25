@@ -29,7 +29,7 @@ Anything beyond this table is a defect. If a later feature seems to need another
 Takes about 15 minutes. Do it in a browser signed in as the account that owns `taskflow`.
 
 ### 1. Create a webhook channel
-Open <https://smee.io/new> and copy the channel URL (`https://smee.io/<random>`). SCRUM-9 starts the client that forwards it to the local backend. Until then, deliveries simply queue up in the channel and in the App's **Advanced → Recent deliveries** list.
+Open <https://smee.io/new> and copy the channel URL (`https://smee.io/<random>`). The client that forwards it to your machine is in [Run the webhook tunnel](#run-the-webhook-tunnel). smee.io **does not store** events: anything delivered while no client is connected is lost, although GitHub records it as delivered. Use **Redeliver** to get it again.
 
 > The smee URL is not a secret, but anyone who has it can read the payloads. That is acceptable here because `taskflow` is public and every delivery is still HMAC-verified. Never point a smee channel at a private repository's App.
 
@@ -117,7 +117,60 @@ Use forward slashes in the path. Close the terminal from step 2.
    Any extra key in `permissions` or `events` fails the check: edit the App (**Permissions & events**) and remove it.
 2. **Installation scope:** <https://github.com/settings/installations> → **Configure** next to the App shows **Only select repositories: `taskflow`**.
 3. **Nothing leaked into the repo:** `git status` is clean apart from intended changes, `git ls-files '*.pem'` prints nothing, and gitleaks finds nothing once it is installed (SCRUM-10).
-4. **Webhook reaches GitHub's side:** after the next `taskflow` workflow run, **Advanced → Recent deliveries** on the App page lists a `workflow_run` delivery. It shows as failed until the tunnel and endpoint exist (SCRUM-9, SCRUM-45); that's expected.
+4. **Webhook reaches your machine:** follow [Run the webhook tunnel → Verify](#verify-a-real-delivery). Note that **Recent deliveries** shows a green tick (smee.io answered 200) whether or not anything on your machine received the event; only the receiver's log proves it arrived.
+
+## Run the webhook tunnel
+
+**Tool: smee.io** (SCRUM-9). The development App's webhook URL is a smee channel, so it never changes between sessions. A client on your machine holds an open connection to the channel and replays each event as a POST to the local endpoint. cloudflared is the fallback for one case (see [Signatures through smee](#signatures-through-smee)).
+
+| | smee.io (default) | cloudflared quick tunnel (fallback) |
+|---|---|---|
+| Public URL | Stable channel URL, set once in the App | New random `*.trycloudflare.com` URL on every start; update the App's webhook URL each time |
+| Body bytes | Re-serialized JSON (see below) | Byte-exact |
+| Tunnel down | smee.io still answers 200; the event is **lost** (Redeliver it) | GitHub records a failed delivery; Redeliver it |
+| Install | Node only (`npx`) | `winget install Cloudflare.cloudflared` |
+
+### Start
+Two terminals. Before the backend's webhook endpoint exists (SCRUM-45), the stand-in receiver [`infra/scripts/webhook_echo.py`](../infra/scripts/webhook_echo.py) listens on the same path. It logs only event, delivery id, action, size and the HMAC result, never the body or the secret.
+
+```powershell
+# Terminal 1: the receiver on http://127.0.0.1:8000/api/v1/github/webhooks
+#   now:   the stand-in (paste the webhook secret only into this terminal's environment)
+$env:GITHUB_WEBHOOK_SECRET = "<value from your .env>"; py -3 infra/scripts/webhook_echo.py
+#   later: the real backend instead (SCRUM-45+), which reads the secret from .env
+#   cd backend; uv run uvicorn app.main:app --reload
+
+# Terminal 2: the tunnel (pinned client version; Node is enough, no global install)
+npx -y smee-client@5.0.0 --url https://smee.io/<your-channel> --target http://127.0.0.1:8000/api/v1/github/webhooks
+```
+
+The client prints `Connected to https://smee.io/<your-channel>`, then one `POST … - <status>` line per forwarded event.
+
+### Stop
+`Ctrl+C` in both terminals. Stop the stand-in before starting the backend, since both use port 8000.
+
+### Verify a real delivery
+1. Start both terminals as above.
+2. App settings → **Advanced → Recent deliveries**. Open any delivery (the installation event, or a `workflow_run` from a `taskflow` run; push a commit to `taskflow` if the list is empty) and click **Redeliver**.
+3. The smee client prints `POST http://127.0.0.1:8000/api/v1/github/webhooks - 202`, and the receiver prints `event=… delivery=<the GUID shown in GitHub> … signature=valid`.
+
+`signature=INVALID` means the secret in terminal 1 doesn't match the App's (fix it), or the payload hit the smee limitation below.
+
+### Tunnel down (failure path)
+- **Client stopped:** smee.io still returns 200 to GitHub, so the delivery shows as delivered, but it reached nothing. **Receiver stopped, client running:** the client logs `TypeError: fetch failed … ECONNREFUSED 127.0.0.1:8000` and the event is dropped.
+- Either way: restart what was down, then **Redeliver** the affected deliveries from **Recent deliveries** (GitHub keeps them for 3 days). The same delivery GUID comes back, so the real endpoint's `X-GitHub-Delivery` de-duplication handles a redelivery of something it already processed.
+- In the product, lost `workflow_run` events are also recovered by the reconcile sweep ([guide §10.3](DEVELOPMENT_LIFECYCLE.md#103-dispatch-inputs-correlation-and-callbacks)), so the tunnel is never the only path. In local dev, Redeliver is quicker.
+
+### Signatures through smee
+smee forwards `JSON.stringify(JSON.parse(body))`, not the original bytes. Tested 24 Nov 2026 with smee-client 5.0.0: compact JSON with raw UTF-8 and emoji keeps a valid `X-Hub-Signature-256`. `\uXXXX` and `\/` escapes, integers above 2^53, and floats such as `1.0` are rewritten, so the HMAC fails. GitHub sends compact JSON, so normal deliveries verify. If one delivery fails with `signature=INVALID` while others pass, replay it through cloudflared before debugging the endpoint:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8000
+# set the App's webhook URL to https://<printed-host>.trycloudflare.com/api/v1/github/webhooks, Redeliver,
+# then set it back to the smee channel URL
+```
+
+Never weaken the endpoint's HMAC check to make a tunnel work.
 
 ## Rotation and incidents
 
