@@ -6,15 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ReleaseGuard is a **deployment approval and rollback manager** for small teams. It is **not** a CI/CD engine. GitHub Actions builds and deploys. ReleaseGuard decides whether a release may proceed, records every decision, dispatches approved workflows, verifies health over HTTP and coordinates rollback to an earlier image **digest**.
 
-- **Status:** pre-code. The docs and the monorepo layout (README placeholders in `backend/`, `frontend/`, `worker/`, `infra/`) exist; no app code yet. **Current sprint: 1, Foundation (Thu 26 – Fri 27 Nov 2026) → `v0.1.0`, Epic SCRUM-12 (Tasks SCRUM-18…34); board sprint active since 24 Nov. Sprint 0 closed Tue 24 Nov ([retro](docs/retros/sprint-0.md)). All sprints are planned in Jira (Epics SCRUM-12…17, Tasks SCRUM-18…109); MVP Wed 2 Dec 2026 (schedule compressed to 7 days on 25 Nov; the cut list in the plan applies first).** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
+- **Status:** early build. The backend skeleton exists (`backend/`: config, error shape, Origin-check CSRF, role matrix; SCRUM-18); `frontend/`, `worker/` and `infra/` are still README placeholders. **Current sprint: 1, Foundation (Thu 26 – Fri 27 Nov 2026) → `v0.1.0`, Epic SCRUM-12 (Tasks SCRUM-18…34); board sprint active since 24 Nov. Sprint 0 closed Tue 24 Nov ([retro](docs/retros/sprint-0.md)). All sprints are planned in Jira (Epics SCRUM-12…17, Tasks SCRUM-18…109); MVP Wed 2 Dec 2026 (schedule compressed to 7 days on 25 Nov; the cut list in the plan applies first).** Claude updates this line when a sprint closes and the next one starts. Work follows [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); check the sprint's checklist and Definition of Done before starting work.
 - **Source of truth:** [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) covers architecture, data model, state machine, API, security and process. The original spec is [docs/ReleaseGuard_Project_Specification.pdf](docs/ReleaseGuard_Project_Specification.pdf).
 - **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` ([hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow), a separate, small, public sample app with two workflows: `ci.yml`, which registers each release through GitHub OIDC, and `deploy.yml`, which ReleaseGuard dispatches for every environment and for rollback). The demo depends on both.
 - **Team:** one full-stack developer. Prefer vertical slices that can be demoed at the end of each sprint over horizontal layers.
-- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and the user has squash-merged its PR (**the user always merges PRs by hand; Claude never merges**) (Git rhythm: commit per green step, push at session end, one PR per Task, **or one PR for all of them when the user asks to complete several Tasks in bulk**; never stack Task PRs; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
+- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and the user has squash-merged its PR (**the user always merges PRs by hand; Claude never merges**) (Git rhythm: commit per green step, push at session end, **commit, push and open the PR automatically as soon as a Task (or bulk set) is complete, without waiting for the user**, one PR per Task, **or one PR for all of them when the user asks to complete several Tasks in bulk**; never stack Task PRs; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
 
 ## Commands
 
-> These are **planned** (from lifecycle guide §14.6 and §14.10). Verify them, and fix this section, once Sprint 0/1 scaffolding exists.
+> Lines marked `(planned)` don't work yet; verify each one, and drop its marker, when the Task that adds it lands. The other backend lines are verified (SCRUM-18).
 
 ```bash
 # Git hooks (gitleaks, Ruff, ESLint, Prettier); once per clone, then they run on every commit
@@ -26,14 +26,15 @@ docker compose -f infra/docker-compose.yml up -d db          # Postgres only
 docker compose -f infra/docker-compose.yml up --build        # everything
 
 # Backend (Python 3.12+, uv). Run from backend/; `uv run` uses the project venv.
-cd backend && uv sync
-uv run alembic upgrade head && uv run python -m app.scripts.seed   # migrate + seed (1 workspace, 4 users, TaskFlow)
+# Settings come from env vars or the repo-root .env; SITE_ORIGIN is required, and ENV defaults to production (set ENV=local).
+cd backend && uv sync                                              # Python 3.12 is pinned in .python-version
+uv run alembic upgrade head && uv run python -m app.scripts.seed   # (planned, SCRUM-19/25) migrate + seed
 uv run uvicorn app.main:app --reload                               # http://localhost:8000/docs
-uv run python -m app.worker                                        # worker: job loop + sweeps (second terminal)
-uv run pytest                                                      # all tests (needs Postgres)
+uv run python -m app.worker                                        # (planned) worker: job loop + sweeps
+uv run pytest                                                      # all tests (Postgres needed from SCRUM-19)
 uv run pytest tests/path/test_file.py::test_name                   # single test
-uv run ruff check . && uv run ruff format --check . && uv run mypy app   # lint + types
-uv run alembic upgrade head && uv run alembic check                # migration gate (on an empty DB)
+uv run ruff check . && uv run ruff format --check . && uv run mypy app tests   # lint + types
+uv run alembic upgrade head && uv run alembic check                # (planned, SCRUM-19) migration gate
 
 # Frontend (Node LTS, pnpm: not installed yet, `corepack enable` or `npm i -g pnpm`)
 cd frontend && pnpm install && pnpm dev                       # http://localhost:3000

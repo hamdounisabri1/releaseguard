@@ -119,7 +119,7 @@ Each sprint was sized at about **8.5 working days of planned work and 1.5 days o
 **Goal:** a user can sign in, create an application and configure its three environments.
 
 **Backend**
-- [ ] SCRUM-18 FastAPI app skeleton: `core/config.py` (pydantic-settings), `core/security.py`, `core/permissions.py`, the `api/v1` router layout, a standard error shape, and the **Origin-check CSRF middleware** ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md))
+- [x] SCRUM-18 FastAPI app skeleton: `core/config.py` (pydantic-settings), `core/security.py`, `core/permissions.py`, the `api/v1` router layout, a standard error shape, and the **Origin-check CSRF middleware** ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md))
 - [ ] SCRUM-19 SQLAlchemy 2.0 models and the first Alembic migration: `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments` (health fields + `policy` JSONB + health state), `audit_logs` with the **append-only trigger**; `workspace_id` and composite FKs on every tenant table
 - [ ] SCRUM-20 Auth: argon2id, server-side sessions (hashed id, idle and absolute timeout, rotate on login), `HttpOnly`/`Secure`/`SameSite=Lax` cookie, login, logout and `me`
 - [ ] SCRUM-21 RBAC dependency: `require_role(Role.ADMIN, …)` plus workspace scoping on every query
@@ -317,13 +317,13 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
-- **Date:** Tue 24 Nov 2026
-- **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1) · SCRUM-8 Development GitHub App (PR #2) · SCRUM-7 Protect main on both repos, PR template, labels (PR #3) · SCRUM-11 ADR-0001 and ADR-0002 · SCRUM-9 Webhook tunnel (smee.io) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example`
-- **Today's Tasks:** none left. Sprint 0 is closed ([retro](retros/sprint-0.md)); PRs #5 → #6 → #7 → sprint-close await squash-merge, in that order
+- **Date:** Wed 25 Nov 2026
+- **Done today:** SCRUM-18 Backend skeleton (PR pending merge)
+- **Today's Tasks:** SCRUM-26 Next.js App Router scaffold (0.5d, p0). Unblocked (its only blocker, SCRUM-6, is Done)
 - **Carried over:** none
 - **Blocked:** none
-- **Next:** Sprint 1 (board sprint already active). Its first Task, SCRUM-18 (FastAPI skeleton), can start early on Wed 25 Nov if you want
-- **Schedule:** ahead of plan: Sprint 0 closed a day early (planned end Wed 25 Nov).
+- **Next:** SCRUM-19 (models and first migration) and SCRUM-27 (API client) unlock once SCRUM-18 and SCRUM-26 are Done. Sprint 0 PRs #5–#8 are all merged
+- **Schedule:** compressed on 25 Nov (#9): Sprint 1 ends Fri 27 Nov and the MVP is Wed 2 Dec, so the cut list applies first. Sprint 1 still has 16 Tasks open after SCRUM-18
 
 ### Labels
 | Group | Labels |

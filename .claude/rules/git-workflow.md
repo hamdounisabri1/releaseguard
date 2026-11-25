@@ -7,7 +7,7 @@
 - **Don't stack Task PRs.** Branch every Task from an up-to-date `main`, never from another unmerged Task branch. Squash-merging the lower PR rewrites its commits, so every PR stacked on it then conflicts. If a stack already exists, after each merge run `git rebase --onto origin/main <old-tip-of-merged-branch> <next-branch>` and force-push it with `--force-with-lease`.
 - Conventional Commits with a scope: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra` or `docs`. Example: `feat(api): block self-approval when policy enabled`. Reference the Jira issue in the commit body or PR title (`SCRUM-12`) so Jira links it.
 - Squash-merge. SemVer tags at the end of each sprint: `v0.1.0` … `v0.5.0`, then `v1.0.0` for the MVP.
-- Commit or push only when the user asks. Use `/commit` or `/commit-push-pr` (commit-commands plugin).
+- **Finishing a Task ships it without asking** (user preference, 25 Nov 2026): when a Task, or a bulk set of Tasks, is complete (code, tests and docs green, plan checkbox ticked), Claude commits, pushes the branch and opens a ready-for-review PR right away, without waiting for the user. It still never merges. Mid-Task commits after each green step are fine too. Other pushes (unfinished work, tags) still wait for the user. Use `/commit` or `/commit-push-pr` (commit-commands plugin) or plain `git`/`gh`.
 
 ## Daily Git rhythm
 | When | Git action |
@@ -23,7 +23,7 @@
 - **Leave no edit behind on `main`.** Every file change goes through a branch and a PR, including process edits: the Task's own plan checkbox (ticked in its PR, before merge), the daily "Today" block (rides on the day's first Task branch), and sprint-close edits (retro, "Current sprint" line, leftover ticks) in a `docs/sprint-<N>-close` PR. Anything that would only happen after a merge must be done before it, inside the PR.
 - **The user merges every PR, by hand, in GitHub. Claude never merges** (`gh pr merge` and the MCP merge tool are denied in `.claude/settings.json`). Claude says when a PR is ready to merge; once `gh pr view <n> --json state` shows `MERGED`, it marks the Task Done, deletes the local branch and pulls `main`.
 - After merging, delete the branch and pull `main`.
-- Claude reminds the user at each of these points (commit after a green step, push at session end) and runs the command once the user says so.
+- Claude commits after each green step and, when the Task is complete, pushes and opens the PR on its own (see above). For an unfinished branch at session end, it reminds the user and pushes once they say so.
 - **Commit on demand:** the user can ask for a commit (or a push) at any time, not only at these points. Claude does it right away: it reviews `git diff --staged` for secrets, writes a Conventional Commit message with the Jira key, and commits on the current Task branch. If the current branch is `main`, it creates the Task branch first, because nothing is committed directly to `main`.
 
 ## Issues (Definition of Ready)
