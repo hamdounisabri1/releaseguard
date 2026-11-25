@@ -5,9 +5,9 @@
 #   infra/github/setup-repo.sh hamdounisabri1/releaseguard
 #   infra/github/setup-repo.sh hamdounisabri1/taskflow
 #
-# 1. Merge settings: squash-only, PR title/body as the squash commit, delete branch on merge.
+# 1. Merge settings: rebase-merge only (main keeps every commit), delete branch on merge.
 # 2. Labels: the set from docs/PROJECT_PLAN.md §5; GitHub's default labels are removed.
-# 3. Ruleset `protect-main` (ruleset-main.json): PR required, squash-only, no force-push,
+# 3. Ruleset `protect-main` (ruleset-main.json): PR required, rebase-merge only, no force-push,
 #    no deletion, linear history, no bypass actors.
 set -euo pipefail
 
@@ -18,12 +18,10 @@ ruleset_name="protect-main"
 
 echo "== $repo: merge settings"
 gh api -X PATCH "repos/$repo" --silent \
-  -F allow_squash_merge=true \
+  -F allow_squash_merge=false \
   -F allow_merge_commit=false \
-  -F allow_rebase_merge=false \
-  -F delete_branch_on_merge=true \
-  -f squash_merge_commit_title=PR_TITLE \
-  -f squash_merge_commit_message=PR_BODY
+  -F allow_rebase_merge=true \
+  -F delete_branch_on_merge=true
 
 echo "== $repo: labels"
 # name|color|description (keep in sync with docs/PROJECT_PLAN.md §5 "Labels")
