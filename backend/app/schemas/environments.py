@@ -2,9 +2,9 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.enums import EnvironmentType, HealthStatus
 
@@ -29,10 +29,28 @@ class EnvironmentPolicy(BaseModel):
     rollback_requires_approval: bool = False
 
 
+def _reject_nulls(model: BaseModel, nullable: frozenset[str] = frozenset()) -> None:
+    """PATCH semantics: an omitted field is unchanged; an explicit null is an error unless the
+    field is really nullable (otherwise it would 500 later or be silently ignored).
+    """
+    nulls = [
+        name
+        for name in model.model_fields_set
+        if name not in nullable and getattr(model, name) is None
+    ]
+    if nulls:
+        raise ValueError("fields can't be set to null: " + ", ".join(sorted(nulls)))
+
+
 class EnvironmentPolicyUpdate(BaseModel):
-    """Only the fields sent are changed."""
+    """Only the fields sent are changed. Only ``promote_from_environment_id`` may be null."""
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _no_nulls(self) -> Self:
+        _reject_nulls(self, frozenset({"promote_from_environment_id"}))
+        return self
 
     auto_deploy_on_release: bool | None = None
     requires_approval: bool | None = None
@@ -49,6 +67,11 @@ class EnvironmentUpdate(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _no_nulls(self) -> Self:
+        _reject_nulls(self)
+        return self
 
     expected_status: Annotated[int, Field(ge=100, le=599)] | None = None
     check_interval_seconds: Annotated[int, Field(ge=10, le=86_400)] | None = None

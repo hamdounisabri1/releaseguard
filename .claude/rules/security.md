@@ -32,6 +32,8 @@ ReleaseGuard has authority over production releases. These rules apply to all co
 
 ## Data handling
 - Logs never contain secrets, tokens, cookies or full webhook payloads. Redact before logging.
+- Database errors: the engine uses `hide_parameters=True`, and the 500 handler logs a `DBAPIError` as its driver class, SQLSTATE and stack frames only, **never its message** (Postgres echoes row values there, e.g. a unique violation's `DETAIL: Key (token_hash)=…`).
+- `repository_id` binds CI OIDC tokens to an application (ADR-0006): changing `repository_owner`/`repository_name` must restate `repository_id` (422 `repository_id_required` otherwise).
 - Anything sent to the AI provider goes through the sanitizer first (see `ai.md`).
 - Commit no secrets: use `.env` (git-ignored), GitHub encrypted secrets, and a `chmod 600` env file on the VPS. Secret scanning: **`pre-commit` runs gitleaks on the staged changes of every commit** (`.pre-commit-config.yaml`; run `pre-commit install` once per clone) and blocks on findings. The `.claude/hooks/pre_bash.py` hook also runs it on Claude's `git commit` when a `gitleaks` binary is on `PATH`. Never bypass a finding with `--no-verify`: remove the secret, and rotate it if it was ever pushed. Still review `git diff --staged` before committing.
 - Never read `.env`, `*.pem` or `*.key` files (they are denied in `.claude/settings.json` and blocked in the Bash hook). Edit `.env.example` instead.

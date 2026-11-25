@@ -278,3 +278,20 @@ async def test_sessions_are_tied_to_one_workspace(db_client: AsyncClient, db: Se
     assert body["workspace"]["id"] == str(other.id)
     assert body["role"] == "viewer"
     assert db.get(Workspace, home.id) is not None
+
+
+async def test_logging_out_of_an_expired_session_writes_no_logout_entry(
+    db_client: AsyncClient, db: Session
+) -> None:
+    workspace = make_workspace(db)
+    user = make_workspace_user(db, workspace, Role.VIEWER)
+    sign_in(db_client, db, user.id, workspace.id)
+    (session,) = _sessions(db)
+    session.last_seen_at = datetime.now(UTC) - IDLE_TIMEOUT - timedelta(minutes=1)
+    db.flush()
+
+    response = await db_client.post("/api/v1/auth/logout", headers=ORIGIN)
+
+    assert response.status_code == 204
+    assert _sessions(db) == []
+    assert db.scalars(select(AuditLog).where(AuditLog.actor_id == user.id)).all() == []

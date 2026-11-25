@@ -89,7 +89,13 @@ def seed(db: Session, password: str) -> SeedResult:
     db.commit()
 
     owner, name = TASKFLOW.repository_owner, TASKFLOW.repository_name
-    if application_repository.get_by_repository(db, workspace.id, owner, name) is None:
+    # Matched by name or by repository id, so a renamed TaskFlow still counts as seeded.
+    existing = application_repository.get_by_repository(db, workspace.id, owner, name)
+    if existing is None and TASKFLOW.repository_id is not None:
+        existing = application_repository.get_by_repository_id(
+            db, workspace.id, TASKFLOW.repository_id
+        )
+    if existing is None:
         provision_application(db, actor, TASKFLOW)  # audits and commits
         result.created.append(f"application {owner}/{name}")
     return result

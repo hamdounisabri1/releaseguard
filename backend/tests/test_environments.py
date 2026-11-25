@@ -180,3 +180,37 @@ async def test_environments_of_an_archived_application_cannot_be_edited(
     response = await _patch(db_client, dev["id"], {"failure_threshold": 4})
 
     assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"policy": {"min_approvals": None}},
+        {"policy": {"requires_approval": None}},
+        {"failure_threshold": None},
+        {"policy": None},
+    ],
+    ids=lambda b: str(b),
+)
+async def test_explicit_nulls_are_422_not_500(
+    db_client: AsyncClient, db: Session, body: dict[str, Any]
+) -> None:
+    _as(db_client, db, Role.ADMIN)
+    _, _, prod = await _environments(db_client)
+
+    response = await _patch(db_client, prod["id"], body)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+async def test_promote_from_can_be_cleared(db_client: AsyncClient, db: Session) -> None:
+    _as(db_client, db, Role.ADMIN)
+    _, staging, _ = await _environments(db_client)
+
+    response = await _patch(
+        db_client, staging["id"], {"policy": {"promote_from_environment_id": None}}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["policy"]["promote_from_environment_id"] is None

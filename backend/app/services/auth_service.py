@@ -135,14 +135,24 @@ def login(
     return LoginResult(token, CurrentUser(user, workspace, Role(membership.role)))
 
 
+def _expired(session: UserSession, now: datetime) -> bool:
+    return now >= session.expires_at or now >= session.last_seen_at + IDLE_TIMEOUT
+
+
 def logout(db: Session, token: str | None) -> None:
-    """End the session behind ``token``, if there is one. Idempotent."""
+    """End the session behind ``token``, if there is one. Idempotent.
+
+    An already-expired session is just deleted: it ended earlier, so no ``auth.logout`` entry.
+    """
     if not token:
         return
     session = identity.get_session_by_token_hash(db, hash_token(token))
     if session is None:
         return
     identity.delete_session(db, session.id)
+    if _expired(session, _now()):
+        db.commit()
+        return
     record_audit(
         db,
         Actor.user(session.workspace_id, session.user_id),
@@ -158,7 +168,7 @@ def resolve_session(db: Session, token: str, *, now: datetime | None = None) -> 
     session = identity.get_session_by_token_hash(db, hash_token(token))
     if session is None:
         raise UnauthorizedError()
-    if now >= session.expires_at or now >= session.last_seen_at + IDLE_TIMEOUT:
+    if _expired(session, now):
         identity.delete_session(db, session.id)
         db.commit()
         raise SessionExpiredError()

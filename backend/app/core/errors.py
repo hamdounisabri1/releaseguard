@@ -4,6 +4,7 @@ Services raise ``AppError`` subclasses; routes never build error responses by ha
 """
 
 import logging
+import traceback
 from http import HTTPStatus
 from typing import Any
 
@@ -11,6 +12,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
@@ -142,12 +144,25 @@ async def _validation_error_handler(request: Request, exc: Exception) -> JSONRes
 
 
 async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error(
-        "unhandled error on %s %s",
-        request.method,
-        request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
-    )
+    if isinstance(exc, DBAPIError):
+        # Postgres puts row values in its messages (`invalid input …: "<value>"`, a unique
+        # violation's `DETAIL: Key (...)=(...)`), and those can be password or token hashes.
+        # Log where it failed and the error class, never the message.
+        logger.error(
+            "unhandled database error on %s %s: %s (sqlstate %s)\n%s",
+            request.method,
+            request.url.path,
+            type(exc.orig).__name__,
+            getattr(exc.orig, "sqlstate", None),
+            "".join(traceback.format_tb(exc.__traceback__)),
+        )
+    else:
+        logger.error(
+            "unhandled error on %s %s",
+            request.method,
+            request.url.path,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
     # Starlette sends this response from outside the user middleware, so the request-ID
     # middleware can't add its header here; add it from the log context instead.
     request_id = structlog.contextvars.get_contextvars().get("request_id")

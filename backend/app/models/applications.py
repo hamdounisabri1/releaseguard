@@ -29,8 +29,16 @@ class Application(Base):
     __table_args__ = (
         # Target of the composite FKs that stop child rows pointing across workspaces.
         UniqueConstraint("id", "workspace_id"),
-        # NULLs never collide, so apps without a known repository id are allowed.
-        UniqueConstraint("workspace_id", "repository_id"),
+        # One *active* application per GitHub repository in a workspace (CI OIDC tokens bind to
+        # repository_id, ADR-0006). Archived apps don't count, so a repository can be registered
+        # again; NULLs never collide.
+        Index(
+            "uq_applications_active_repository_id",
+            "workspace_id",
+            "repository_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
         check_in("status", ApplicationStatus),
     )
 

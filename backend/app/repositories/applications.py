@@ -26,6 +26,31 @@ def get(db: Session, workspace_id: uuid.UUID, application_id: uuid.UUID) -> Appl
     )
 
 
+def get_for_update(
+    db: Session, workspace_id: uuid.UUID, application_id: uuid.UUID
+) -> Application | None:
+    """Like ``get``, holding a row lock until the transaction ends."""
+    return db.scalar(
+        select(Application)
+        .where(Application.workspace_id == workspace_id, Application.id == application_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+def get_by_repository_id(
+    db: Session, workspace_id: uuid.UUID, repository_id: int
+) -> Application | None:
+    """The active application bound to a GitHub repository id."""
+    return db.scalar(
+        select(Application).where(
+            Application.workspace_id == workspace_id,
+            Application.repository_id == repository_id,
+            Application.status == ApplicationStatus.ACTIVE.value,
+        )
+    )
+
+
 def get_by_repository(
     db: Session, workspace_id: uuid.UUID, owner: str, name: str
 ) -> Application | None:

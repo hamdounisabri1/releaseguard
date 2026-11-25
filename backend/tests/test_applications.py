@@ -304,3 +304,37 @@ async def test_an_archived_application_cannot_be_edited(
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "application_archived"
+
+
+async def test_archiving_frees_the_repository_for_a_new_application(
+    db_client: AsyncClient, db: Session
+) -> None:
+    _as(db_client, db, Role.ADMIN)
+    old = await _create(db_client, repository_id=99)
+    await db_client.post(f"{BASE}/{old['id']}/archive", headers=ORIGIN)
+
+    new = await _create(db_client, repository_id=99)
+
+    assert new["id"] != old["id"]
+
+
+async def test_moving_to_another_repository_needs_the_repository_id(
+    db_client: AsyncClient, db: Session
+) -> None:
+    _as(db_client, db, Role.ADMIN)
+    app = await _create(db_client, repository_id=111)
+    path = f"{BASE}/{app['id']}"
+
+    refused = await db_client.patch(path, json={"repository_name": "other"}, headers=ORIGIN)
+    case_only = await db_client.patch(
+        path, json={"repository_name": app["repository_name"].upper()}, headers=ORIGIN
+    )
+    moved = await db_client.patch(
+        path, json={"repository_name": "other", "repository_id": 222}, headers=ORIGIN
+    )
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "repository_id_required"
+    assert case_only.status_code == 200
+    assert moved.status_code == 200
+    assert moved.json()["repository_id"] == 222

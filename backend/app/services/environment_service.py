@@ -64,15 +64,20 @@ def update_environment(
 ) -> Environment:
     ensure_can(principal, Capability.CONFIGURE_ENVIRONMENTS)
     environment = found(environment_repository.get(db, principal.workspace_id, environment_id))
+    # Lock the application row: edits to its environments are serialized, so two concurrent
+    # policy changes can't each pass the cycle check and together create a promotion cycle.
     application = found(
-        application_repository.get(db, principal.workspace_id, environment.application_id)
+        application_repository.get_for_update(
+            db, principal.workspace_id, environment.application_id
+        )
     )
     if application.status == ApplicationStatus.ARCHIVED:
         raise ApplicationArchivedError()
+    db.refresh(environment)  # re-read under the lock
 
     changes: dict[str, dict[str, Any]] = {}
     for field, value in data.model_dump(exclude_unset=True, exclude={"policy"}).items():
-        if value is not None and getattr(environment, field) != value:
+        if getattr(environment, field) != value:
             changes[field] = {"from": getattr(environment, field), "to": value}
 
     if data.policy is not None:

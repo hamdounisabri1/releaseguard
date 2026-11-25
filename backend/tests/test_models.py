@@ -1,14 +1,17 @@
 """Schema integration tests against real Postgres: migrations, tenancy FKs, append-only audit."""
 
+import io
+
 import pytest
 from alembic import command
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.logging import configure_logging
 from app.models import AuditLog, Environment
 from app.models.enums import ActorType, EnvironmentType
-from tests.conftest import alembic_config
+from tests.conftest import alembic_config, build_app, client_for
 from tests.factories import make_application, make_environment, make_user, make_workspace
 
 TABLES = {
@@ -109,3 +112,26 @@ def test_user_actor_must_name_the_user(db: Session) -> None:
     )
     with pytest.raises(IntegrityError, match="ck_audit_logs_actor_id"):
         db.flush()
+
+
+def test_sqlalchemy_hides_bound_parameters(engine: Engine) -> None:
+    with engine.connect() as connection, pytest.raises(DBAPIError) as caught:
+        connection.execute(text("SELECT CAST(:value AS integer)"), {"value": "token-abc-123"})
+
+    assert "SQL parameters hidden" in str(caught.value)
+
+
+async def test_a_database_error_500_never_logs_row_values() -> None:
+    """Postgres echoes values in its own messages; the 500 handler must not log them."""
+    app = build_app()
+    stream = io.StringIO()
+    configure_logging("INFO", stream=stream)
+
+    async with client_for(app) as client:
+        response = await client.get("/api/v1/_test/db-error")
+
+    assert response.status_code == 500
+    output = stream.getvalue()
+    assert "token-abc-123" not in output
+    assert "unhandled database error" in output
+    assert "InvalidTextRepresentation" in output

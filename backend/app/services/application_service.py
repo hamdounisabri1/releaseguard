@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import ConflictError
+from app.core.errors import ConflictError, UnprocessableError
 from app.core.permissions import Capability
 from app.models import Application, Environment
 from app.models.enums import ApplicationStatus, EnvironmentType
@@ -20,12 +20,19 @@ from app.services.audit import Actor, AuditTarget, record_audit
 from app.services.auth_service import Principal
 from app.services.authz import ensure_can, found
 
-_REPOSITORY_ID_TAKEN = "uq_applications_workspace_id_repository_id"
+# Partial unique index: one *active* application per repository id in a workspace, so archiving
+# an application frees its repository for a new one.
+_REPOSITORY_ID_TAKEN = "uq_applications_active_repository_id"
 
 
 class RepositoryAlreadyRegisteredError(ConflictError):
     code = "repository_already_registered"
     message = "Another application in this workspace already uses this repository."
+
+
+class RepositoryIdRequiredError(UnprocessableError):
+    code = "repository_id_required"
+    message = "Changing the repository also needs repository_id: the new repository's id, or null."
 
 
 class ApplicationArchivedError(ConflictError):
@@ -120,6 +127,23 @@ def get_application(db: Session, principal: Principal, application_id: uuid.UUID
     return found(application_repository.get(db, principal.workspace_id, application_id))
 
 
+def _check_repository_binding(application: Application, data: ApplicationUpdate) -> None:
+    """``repository_id`` binds CI OIDC tokens to the app (ADR-0006). Pointing the app at another
+    repository without restating the id would leave the old repository's CI trusted.
+    """
+    moved = any(
+        field in data.model_fields_set
+        and str(getattr(data, field)).lower() != str(getattr(application, field)).lower()
+        for field in ("repository_owner", "repository_name")
+    )
+    if (
+        moved
+        and application.repository_id is not None
+        and "repository_id" not in data.model_fields_set
+    ):
+        raise RepositoryIdRequiredError()
+
+
 def update_application(
     db: Session, principal: Principal, application_id: uuid.UUID, data: ApplicationUpdate
 ) -> Application:
@@ -134,6 +158,7 @@ def update_application(
             changes[field] = {"from": getattr(application, field), "to": value}
     if not changes:
         return application
+    _check_repository_binding(application, data)
 
     try:
         with db.begin_nested():

@@ -20,10 +20,10 @@ from typing import Any
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -38,6 +38,8 @@ TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 SITE_ORIGIN = "http://testserver"
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 ALL_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]
+# Built at runtime so the literal never appears in a traceback's source lines.
+DB_ERROR_VALUE = "-".join(["token", "abc", "123"])
 
 
 class Payload(BaseModel):
@@ -86,6 +88,12 @@ def _test_router() -> APIRouter:
     @router.post("/_test/validate")
     async def validate(payload: Payload) -> Payload:
         return payload
+
+    @router.get("/_test/db-error")
+    def db_error(request: Request) -> None:
+        # Postgres echoes the bad value in its message: `invalid input syntax …: "token-abc-123"`.
+        with request.app.state.engine.connect() as connection:
+            connection.execute(text("SELECT CAST(:value AS integer)"), {"value": DB_ERROR_VALUE})
 
     return router
 

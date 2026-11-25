@@ -70,3 +70,16 @@ def test_seed_refuses_production() -> None:
     )
 
     assert run(settings) == 1
+
+
+def test_a_renamed_taskflow_still_counts_as_seeded(db: Session) -> None:
+    seed(db, PASSWORD)
+    app = db.scalar(select(Application).where(Application.repository_name == "taskflow"))
+    assert app is not None
+    app.repository_name = "taskflow-renamed"
+    db.commit()
+
+    result = seed(db, PASSWORD)
+
+    assert result.created == []
+    assert db.scalar(select(func.count()).select_from(Application)) == 1

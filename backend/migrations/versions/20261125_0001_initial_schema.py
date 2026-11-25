@@ -114,9 +114,13 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_applications")),
         sa.UniqueConstraint("id", "workspace_id", name=op.f("uq_applications_id_workspace_id")),
-        sa.UniqueConstraint(
-            "workspace_id", "repository_id", name=op.f("uq_applications_workspace_id_repository_id")
-        ),
+    )
+    op.create_index(
+        "uq_applications_active_repository_id",
+        "applications",
+        ["workspace_id", "repository_id"],
+        unique=True,
+        postgresql_where=sa.text("status = 'active'"),
     )
     op.create_table(
         "audit_logs",
@@ -318,6 +322,7 @@ def downgrade() -> None:
     # DROP TABLE isn't blocked by the triggers (they cover UPDATE, DELETE and TRUNCATE only).
     op.drop_table("audit_logs")
     op.execute("DROP FUNCTION forbid_history_mutation()")
+    op.drop_index("uq_applications_active_repository_id", table_name="applications")
     op.drop_table("applications")
     op.drop_table("workspaces")
     op.drop_table("users")

@@ -44,4 +44,6 @@ def list_for_application(
             Environment.application_id == application_id,
         )
         .order_by(_PROMOTION_ORDER)
+        # Fresh values even for rows already in the session (callers read them under a lock).
+        .execution_options(populate_existing=True)
     ).all()
