@@ -317,12 +317,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
-- **Date:** Tue 24 Nov 2026
-- **Done today:** SCRUM-6 Repos: monorepo layout + public taskflow repo (PR #1) · SCRUM-8 Development GitHub App (PR #2) · SCRUM-7 Protect main on both repos, PR template, labels (PR #3) · SCRUM-11 ADR-0001 and ADR-0002 · SCRUM-9 Webhook tunnel (smee.io) · SCRUM-10 pre-commit, `.editorconfig`, `.env.example`
-- **Today's Tasks:** none left. Sprint 0 is closed ([retro](retros/sprint-0.md)); PRs #5 → #6 → #7 → sprint-close await squash-merge, in that order
+- **Date:** Wed 25 Nov 2026
+- **Done today:** none yet
+- **Today's Tasks:** SCRUM-18 Backend skeleton (0.5d, p0) · SCRUM-26 Next.js App Router scaffold (0.5d, p0). Both unblocked (their only blocker, SCRUM-6, is Done)
 - **Carried over:** none
 - **Blocked:** none
-- **Next:** Sprint 1 (board sprint already active). Its first Task, SCRUM-18 (FastAPI skeleton), can start early on Wed 25 Nov if you want
+- **Next:** SCRUM-19 (models and first migration) and SCRUM-27 (API client) unlock once SCRUM-18 and SCRUM-26 are Done. Sprint 0 PRs #5–#8 are all merged
 - **Schedule:** ahead of plan: Sprint 0 closed a day early (planned end Wed 25 Nov).
 
 ### Labels
