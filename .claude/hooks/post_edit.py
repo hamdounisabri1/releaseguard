@@ -21,17 +21,26 @@ TIMEOUT = 60
 
 def run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | None:
     try:
-        return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT)
+        return subprocess.run(
+            args, check=False, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
 
 
-def report(result: subprocess.CompletedProcess[str] | None, label: str) -> None:
+def report(
+    result: subprocess.CompletedProcess[str] | None,
+    label: str,
+    *,
+    quiet_if_missing: bool = False,
+) -> None:
     if result is None or result.returncode == 0:
         return
     output = (result.stdout + result.stderr).strip()
-    # Tool not installed in the project yet: stay silent.
-    if any(s in output.lower() for s in ("failed to spawn", "not found", "no such file", "cannot find")):
+    # `uv run ruff` before ruff is installed: stay silent. Only for callers that can't check
+    # the tool exists up front; otherwise a real finding mentioning "not found" is dropped.
+    missing = ("failed to spawn", "not found", "no such file", "cannot find")
+    if quiet_if_missing and any(s in output.lower() for s in missing):
         return
     print(f"{label} reported problems:\n{output[-3000:]}", file=sys.stderr)
     sys.exit(2)
@@ -46,7 +55,9 @@ def main() -> None:
     if not file_path:
         return
 
-    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ".").resolve()
+    root = Path(
+        os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or "."
+    ).resolve()
     path = Path(file_path)
     if not path.is_absolute():
         path = root / path
@@ -65,7 +76,11 @@ def main() -> None:
             return
         target = str(path.relative_to(backend))
         run(["uv", "run", "--quiet", "ruff", "format", target], backend)
-        report(run(["uv", "run", "--quiet", "ruff", "check", "--fix", target], backend), "ruff")
+        report(
+            run(["uv", "run", "--quiet", "ruff", "check", "--fix", target], backend),
+            "ruff",
+            quiet_if_missing=True,
+        )
 
     elif rel.parts[0] == "frontend" and path.suffix in {".ts", ".tsx", ".js", ".jsx"}:
         # Run eslint's JS entry with node directly. The Windows `.bin/eslint.cmd` shim goes

@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
@@ -28,15 +29,21 @@ def run_hook(file_path: Path) -> subprocess.CompletedProcess[str]:
     payload = json.dumps({"tool_input": {"file_path": str(file_path)}})
     env = {**os.environ, "CLAUDE_PROJECT_DIR": str(ROOT)}
     return subprocess.run(
-        [sys.executable, str(HOOK)], input=payload, capture_output=True, text=True, env=env
+        [sys.executable, str(HOOK)],
+        check=False,
+        input=payload,
+        capture_output=True,
+        text=True,
+        env=env,
     )
 
 
 @pytest.fixture
 def route_group_dir():
     # A route group path: parentheses broke the Windows eslint.cmd shim (SCRUM-26).
-    folder = FRONTEND / "app" / "(hooktest)"
-    folder.mkdir(exist_ok=True)
+    # Unique name, created fresh, so the cleanup only ever removes what the test made.
+    folder = FRONTEND / "app" / f"(hooktest-{uuid.uuid4().hex[:8]})"
+    folder.mkdir()
     yield folder
     shutil.rmtree(folder)
 
