@@ -36,7 +36,7 @@ paths:
 - Error shape: `{"error": {"code", "message", "details"}}`. Use 403 for a role failure, 404 for another workspace's resource, 409 for an invalid state or lock conflict, 422 for validation.
 - A 422 returns each error's `msg` as is, so **custom Pydantic validators never put the submitted value in their message** (`raise ValueError("must be a bare origin")`, not `f"{value} is invalid"`): it may be a password or token.
 - `/healthz` (liveness) and `/readyz` (DB reachable) are public.
-- Every state-changing service calls `record_audit(actor, action, target, details)`.
+- Every state-changing service calls `record_audit(db, actor, action, target, details)` (`app/services/audit.py`) **before** it commits, so the row shares the change's transaction. `actor` is `Actor.user(workspace_id, user_id)` or `Actor.system(workspace_id)`; `action` is `<area>.<verb>` (`application.created`); `target` is `AuditTarget(type, id)`. Details are redacted like log fields; record what changed (field names, old/new values), never secrets.
 
 ## Integrations
 - Make external HTTP calls with `httpx` (explicit timeouts) wrapped in `tenacity` bounded retries. Never call GitHub or AI inside a request that holds a DB transaction open.

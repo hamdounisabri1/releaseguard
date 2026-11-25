@@ -28,6 +28,7 @@ Settings come from environment variables, falling back to the repository-root `.
 | `app/schemas/errors.py` | `ErrorResponse` for OpenAPI |
 | `app/core/logging.py`, `app/core/request_id.py` | structlog JSON logging with redaction; `RequestIdMiddleware` (`X-Request-ID` in and out, one access line per request) |
 | `app/api/health.py` | `GET /healthz` (liveness) and `GET /readyz` (`SELECT 1`; 503 `not_ready` when the database is unreachable), at the root for container health checks |
+| `app/services/audit.py` | `record_audit(db, actor, action, target, details)`: one `audit_logs` row in the caller's transaction, with redacted details and the request id |
 | `app/db/` | `Base` with the constraint naming convention and `check_in()` (CHECK from an enum); engine and session factory (sync SQLAlchemy 2.0 + psycopg 3) |
 | `app/models/` | `users`, `workspaces`, `workspace_members`, `sessions`, `applications`, `environments`, `audit_logs`; enums mirrored by CHECK constraints; composite FKs keep children in their workspace |
 | `migrations/` | Alembic. `0001` also creates `forbid_history_mutation()` and the `audit_logs` append-only triggers (UPDATE, DELETE, TRUNCATE) |
