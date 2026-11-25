@@ -36,7 +36,7 @@ All plugins come from the official marketplace, `claude-plugins-official`.
 
 | Server | What it does | Used for in ReleaseGuard |
 |---|---|---|
-| **jira** | [`mcp-atlassian`](https://github.com/sooperset/mcp-atlassian) `0.21.0`, run locally with `uvx` (stdio). Credentials come from your environment through `${VAR}` expansion; none are in the file. Limited to project `SCRUM` via `JIRA_PROJECTS_FILTER` | Jira project `SCRUM`: reading the board, creating and transitioning tickets (`jira_*` tools; see `jira-workflow.md`) |
+| **jira** | [`mcp-atlassian`](https://github.com/sooperset/mcp-atlassian) `0.21.0`, run locally with `uvx` (stdio). Credentials come from your environment through `${VAR}` expansion; none are in the file. Limited to project `SCRUM` via `JIRA_PROJECTS_FILTER` | Jira project `SCRUM`: creating issues, links and sprints (`jira_*` tools; see `jira-workflow.md`). Routine reads and transitions go through `.claude/scripts/jira.py` first; this server is the fallback |
 
 ## Skills
 
@@ -77,6 +77,8 @@ Built-in skills the rules also reference (shipped with Claude Code, nothing to i
 | `/new-adr <title>` | Command | Creates the next `docs/adr/NNNN-*.md` from the template |
 | `/lesson <bug>` | Command | Records a lesson in the matching rules file (only when `maintenance.md` §3 says so) |
 | `/dod-check` | Command | Walks the Definition of Done against the current diff |
+| `/bulk last N \| rest \| <keys> \| done` | Command | Bulk mode: runs several Tasks with one plan, one branch, a commit per Task, a single push and PR at the end, and one review and DoD pass on the combined diff. `done` marks them Done after the user merges |
+| `.claude/scripts/jira.py` | Script (stdlib Python) | Primary Jira path: `brief`, `start`, `done`, `today` and `sprint-close` across many tickets per call, in compact output, with `--dry-run` on writes. Reads `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN`; never prints them. Tests: `.claude/scripts/test_jira.py` |
 
 Hooks run with `python`. On Windows, if `python` opens the Microsoft Store stub, install Python from python.org or change the hook command to `py -3` in your `.claude/settings.local.json`.
 

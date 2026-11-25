@@ -10,7 +10,7 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 - **Source of truth:** [docs/DEVELOPMENT_LIFECYCLE.md](docs/DEVELOPMENT_LIFECYCLE.md) covers architecture, data model, state machine, API, security and process. The original spec is [docs/ReleaseGuard_Project_Specification.pdf](docs/ReleaseGuard_Project_Specification.pdf).
 - **Two repositories:** `releaseguard` (this repo, the platform) and `taskflow` ([hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow), a separate, small, public sample app with two workflows: `ci.yml`, which registers each release through GitHub OIDC, and `deploy.yml`, which ReleaseGuard dispatches for every environment and for rollback). The demo depends on both.
 - **Team:** one full-stack developer. Prefer vertical slices that can be demoed at the end of each sprint over horizontal layers.
-- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through the `jira` MCP server, or REST via the `JIRA_*` env vars as a fallback). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and the user has squash-merged its PR (**the user always merges PRs by hand; Claude never merges**) (Git rhythm: commit per green step, push at session end, **commit, push and open the PR automatically as soon as a Task (or bulk set) is complete, without waiting for the user**, one PR per Task, **or one PR for all of them when the user asks to complete several Tasks in bulk**; never stack Task PRs; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
+- **Work tracking:** Jira project **`SCRUM`** is the only tracker (through `.claude/scripts/jira.py` first, many tickets per call; the `jira` MCP server is the fallback). **Several Tasks at once → `/bulk`** (one plan, one branch, a commit per Task, one push and PR at the end, one review). **All sprints are planned in Jira up front** (every Epic, Task and board sprint, from the plan's checklists, after one approval), then worked **one sprint at a time**. **Daily:** in the first session of each new day, Claude picks today's Tasks from the active sprint, labels them `today` in Jira and updates the "Today" block in the plan before other work. **Tasks:** the user starts each Task in plan mode; Claude marks it Done automatically once `/dod-check` passes and the user has squash-merged its PR (**the user always merges PRs by hand; Claude never merges**) (Git rhythm: commit per green step, push at session end, **commit, push and open the PR automatically as soon as a Task (or bulk set) is complete, without waiting for the user**, one PR per Task, **or one PR for all of them when the user asks to complete several Tasks in bulk**; never stack Task PRs; see `git-workflow.md`), and closes the sprint (and starts the next) automatically when its last Task is Done. Put the key in branches, commits and PR titles (`feat/SCRUM-12-approval-gate`). Read [jira-workflow.md](.claude/rules/jira-workflow.md) at the day's first session, when starting or finishing a ticket, at sprint end, or when filing a bug. `/sprint-status` shows the board.
 
 ## Commands
 
@@ -41,7 +41,13 @@ cd frontend && pnpm install && pnpm dev                       # http://localhost
 pnpm lint && pnpm typecheck && pnpm build                     # typecheck = next typegen + tsc --noEmit
 pnpm format:check                                             # Prettier (pnpm format to fix)
 pnpm dlx shadcn@latest add <component>                        # new shadcn/ui primitive into components/ui/
-uv run --no-project --with pytest pytest .claude/hooks        # regression tests for the Claude Code hooks
+uv run --no-project --with pytest pytest .claude/hooks .claude/scripts   # tests for the Claude Code hooks and jira.py
+
+# Jira (SCRUM): many tickets per call; JIRA_URL/JIRA_EMAIL/JIRA_API_TOKEN from the env; writes take --dry-run
+py -3 .claude/scripts/jira.py brief --open --short     # open Tasks in the active sprint: status, plan estimate, blockers
+py -3 .claude/scripts/jira.py brief --last 6           # last 6 open Tasks with acceptance criteria (or list keys)
+py -3 .claude/scripts/jira.py start|done|today <keys>  # In Progress / Done (+comment, -today) / set today labels
+py -3 .claude/scripts/jira.py sprint-close             # close Epic + sprint and start the next, only if all Done
 
 # Local GitHub webhooks (dev App → smee channel → localhost:8000); steps in docs/GITHUB_APP_SETUP.md
 py -3 infra/scripts/webhook_echo.py        # stand-in receiver until SCRUM-45 (GITHUB_WEBHOOK_SECRET in the shell env)
@@ -100,6 +106,8 @@ Detailed rules live in their own files so this file stays short. Files with a `p
 | `settings.json` permissions | Denies reading secret files and deleting repos or files via the GitHub MCP; denies merging PRs (`gh pr merge`, MCP merge: the user merges by hand); asks before `git push` or pushing files via MCP |
 | Agent `release-safety-reviewer` | Checks a diff against the state-machine, approval, webhook, tenancy and dispatch invariants |
 | `/sprint-status` · `/new-adr` · `/lesson` · `/dod-check` | Board summary · next ADR from template · record a lesson · walk the Definition of Done |
+| `/bulk last N \| rest \| <keys> \| done` | Bulk mode: several Tasks with one plan, one branch, a commit per Task, one push and PR, one review and DoD pass; `done` marks them Done after the merge |
+| Script `scripts/jira.py` | Jira in one call for many tickets: `brief`, `start`, `done`, `today`, `sprint-close` (tests: `scripts/test_jira.py`) |
 
 ## Skills, plugins and MCP servers: use them when they fit
 
@@ -115,7 +123,8 @@ The project-scoped tooling is listed in [docs/AI_TOOLING.md](docs/AI_TOOLING.md)
 | Writing complex TypeScript types (generics, unions, mapped types) | `typescript-advanced-types` skill |
 | Writing or reviewing any `.github/workflows/*.yml` | `github-actions-hardening` skill |
 | Writing or changing a Dockerfile | `multi-stage-dockerfile` skill |
-| Reading, creating or updating Jira tickets | `jira` MCP server (`mcp-atlassian`, tools `jira_*`); the `jira-integration` skill is background reference only |
+| Reading, starting, finishing or labelling Jira tickets | `py -3 .claude/scripts/jira.py` first (many keys per call); the `jira` MCP server (`mcp-atlassian`, tools `jira_*`) for creating issues, links and sprints, or if the script fails; the `jira-integration` skill is background reference only |
+| Starting or completing two or more Tasks together | `/bulk` |
 | Planning all sprints up front: turning the `PROJECT_PLAN.md` checklists into Jira Tasks | `/to-tickets` skill (Jira configuration in `jira-workflow.md` §3) |
 | Designing a new component, API, data model or service boundary, or weighing options for a technical decision | `system-design` and `architecture` skills (they inform; `DEVELOPMENT_LIFECYCLE.md` stays the source of truth). Record the decision with `/new-adr` |
 | Writing code against a library API (Next.js, FastAPI, SQLAlchemy, Alembic, Pydantic, TanStack Query, shadcn/ui, GitHub REST) | `context7` (look up current docs) |

@@ -71,6 +71,7 @@ This project uses [Claude Code](https://claude.com/claude-code) with project-sco
 - **MCP servers:** `jira` (`mcp-atlassian`, Jira project `SCRUM`)
 - **Skills:** `ui-ux-pro-max`, `webapp-testing`, `postgresql-table-design`, `postgresql-optimization`, `fastapi-templates`, `typescript-advanced-types`, `github-actions-hardening`, `multi-stage-dockerfile`, `jira-integration`, `to-tickets`, `system-design`, `architecture`
 - **Hooks:** secret-file guard + gitleaks on commit, auto-format/lint after edits
-- **Agents and commands:** `release-safety-reviewer`, `/sprint-status`, `/new-adr`, `/lesson`, `/dod-check`
+- **Agents and commands:** `release-safety-reviewer`, `/sprint-status`, `/new-adr`, `/lesson`, `/dod-check`, `/bulk`
+- **Scripts:** `.claude/scripts/jira.py` (bulk Jira reads and transitions, many tickets per call)
 
 See [docs/AI_TOOLING.md](docs/AI_TOOLING.md) for what each one does and how to set them up after cloning.

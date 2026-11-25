@@ -6,7 +6,17 @@ paths:
 
 # Jira workflow rules: Claude acts as project manager
 
-Jira project **`SCRUM`** (name "ReleaseGuard", team-managed) is the single work tracker (GitHub is used only for code, PRs and Actions runs). Access it through the **`jira` MCP server** (`mcp-atlassian` in `.mcp.json`; tools are named `jira_*`, e.g. `jira_search`, `jira_create_issue`, `jira_transition_issue`). It reads `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN` from your environment (`.mcp.json` maps `JIRA_EMAIL` to the server's `JIRA_USERNAME`; without it the server starts but exposes **no tools**). If the MCP server failed to connect (for example a timeout at session start), first ask the user to reconnect it (`/mcp` → `jira` → Reconnect) and check again for the `jira_*` tools. Only if it still isn't connected, fall back to the Jira Cloud REST API with `curl`, using the env vars `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN` (Basic auth). Parse JSON with Python, because `jq` isn't installed. Search with `/rest/api/3/search/jql`. The `jira-integration` skill is reference material only: its REST examples need `jq` and use the retired `/rest/api/3/search` endpoint.
+Jira project **`SCRUM`** (name "ReleaseGuard", team-managed) is the single work tracker (GitHub is used only for code, PRs and Actions runs).
+
+**Access, script first:** `py -3 .claude/scripts/jira.py` covers the routine steps, many tickets per call, in compact output:
+
+- `brief --open | --last N | <keys>` reads Tasks with plan estimates, blockers and acceptance criteria;
+- `start <keys> --comment …` moves them to In Progress with a comment;
+- `done <keys> --pr <url> --comment …` moves them to Done with a comment and drops `today`;
+- `today <keys>` sets the `today` label to exactly that set;
+- `sprint-close` (§7).
+
+Every write takes `--dry-run`. The script reads `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN` from the environment, never prints them, and exits 1 if any ticket failed. For anything else (creating issues, links, sprints, assignee), or if the script fails, use the **`jira` MCP server** (`mcp-atlassian` in `.mcp.json`; tools named `jira_*`; it maps `JIRA_EMAIL` to its `JIRA_USERNAME` and exposes **no tools** without it). If the MCP server failed to connect, ask the user to reconnect it (`/mcp` → `jira` → Reconnect). The last resort is raw REST: Basic auth, parse JSON with Python (no `jq`), search with `/rest/api/3/search/jql`. The `jira-integration` skill is reference material only: its REST examples need `jq` and use the retired `/rest/api/3/search` endpoint.
 
 This file loads when the plan or a retro is touched. **Read it explicitly** at the start of each day's first session (§4), when starting or finishing a ticket, when a sprint ends, or when filing a bug. `/sprint-status` runs the board summary.
 
@@ -61,9 +71,9 @@ Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plu
 
 ## 4. Daily planning (Claude, first session of each day)
 At the start of the **first session on a new date** (today differs from the date in `PROJECT_PLAN.md` §5 "Today"), do this before any other work, without being asked:
-1. Read the active sprint's Tasks from Jira (status, Blocks links, `today` label) and the sprint's checklist in the plan.
+1. Read the active sprint's Tasks from Jira (status, Blocks links, `today` label) with one call, `jira.py brief --open --short`, and the sprint's checklist in the plan (ranged read).
 2. **Pick today's work:** about one working day (sum of estimates ≈ 10 h, the plan's daily capacity; follow the day's row in the plan's timetable), Tasks from the **active sprint only**, unblocked (every blocker Done), in dependency and priority order (`p0` first). Unfinished Tasks from yesterday come first. If nothing in the active sprint is left, say the sprint is ready to close (§7).
-3. **Mark them in Jira with the `today` label only:** add `today` to the picks and remove it from anything no longer picked. Don't move issues to or from the backlog, between sprints, or re-rank them for the daily plan; leave status as it is. The user's view of today's work is the JQL `project = SCRUM AND labels = today`.
+3. **Mark them in Jira with the `today` label only** (`jira.py today <picks>`): add `today` to the picks and remove it from anything no longer picked. Don't move issues to or from the backlog, between sprints, or re-rank them for the daily plan; leave status as it is. The user's view of today's work is the JQL `project = SCRUM AND labels = today`.
 4. **Update the plan:** rewrite the "Today" block in `PROJECT_PLAN.md` §5 (date, picks with keys, carried over, blocked, schedule note). Tick any checkbox whose Task is Done but not yet ticked. `main` is protected, so this edit stays uncommitted until the day's first Task branch is created and goes in as its first commit (`git-workflow.md`, "Leave no edit behind on `main`").
 5. **Schedule check:** compare the remaining estimates (hours) with the working hours left in the sprint (09:00–20:00 minus the 13:00–14:00 break). If it's behind by more than the day's buffer, say so and propose a fix. The MVP date (Wed 2 Dec 2026) is fixed, so apply the cut list in §6 of the plan in order rather than shifting dates. Change dates or scope only after the user agrees.
 6. Report in at most 6 lines: today's picks, what carried over, what's blocked, and whether the sprint is on track.
@@ -71,7 +81,7 @@ At the start of the **first session on a new date** (today differs from the date
 These daily `today` label edits are pre-approved; don't ask before making them.
 
 ## 5. Working a ticket
-0. Code changes happen only here, while working one Task or Sub-task. One ticket at a time, **except bulk completion**: when the user asks to complete several Tasks together ("bulk complete", or names more than one), they share one branch and one PR (`git-workflow.md`, "Bulk completion = one PR"). Move each of them to In Progress, tick each checkbox in that PR, and mark each Done (with its own closing comment linking the shared PR) once it merges.
+0. Code changes happen only here, while working one Task or Sub-task. One ticket at a time, **except bulk completion**: when the user asks to complete several Tasks together ("bulk complete", or names more than one), they share one branch and one PR (`git-workflow.md`, "Bulk completion = one PR"). Move each of them to In Progress, tick each checkbox in that PR, and mark each Done (with its own closing comment linking the shared PR) once it merges. **Use `/bulk`**, which runs the whole set with one plan, one `jira.py start`, one commit per Task, no intermediate pushes, one push and PR, one review and DoD pass on the combined diff, and one `jira.py done` (`/bulk done` after the merge).
 1. **The user starts the Task in plan mode** ("start SCRUM-12"). Read the ticket, its blockers and the matching rules files, then write the implementation plan (files, steps, tests including failure paths, docs to update).
 2. **After the user approves the plan:** move the Task to **In Progress**, add a short comment with the plan (≤ 5 lines), and branch `feat/SCRUM-<n>-<desc>` from an up-to-date `main`. While working, follow the daily Git rhythm in `git-workflow.md` (commit after each green step, push and open a draft PR at session end).
 3. When the code is done: **on the Task branch, tick the Task's checkbox in `PROJECT_PLAN.md` and move it to "Done today" in the Today block**, so the merge lands them (`main` is protected; nothing can be ticked after the merge without another PR). Then push, wait for CI to be green, and run `/code-review` (plus `/security-review` and the `release-safety-reviewer` agent for auth, RBAC, webhooks, approvals, tokens). The Task stays **In Progress** (the board has no In Review column).
