@@ -137,7 +137,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 ---
 
-### Sprint 1: Foundation (Thu 26 – Fri 27 Nov 2026, 09:00–20:00 · 16.5 h planned of 20 h) → `v0.1.0` · Epic SCRUM-12
+### Sprint 1: Foundation (Thu 26 – Fri 27 Nov 2026, 09:00–20:00 · 18 h planned of 20 h) → `v0.1.0` · Epic SCRUM-12
 **Goal:** a user can sign in, create an application and configure its three environments.
 
 **Backend**
@@ -149,6 +149,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [x] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
 - [x] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
 - [x] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
+- [ ] SCRUM-110 *(1.5 h)* Login throttling (found in SCRUM-20): `login_attempts` table, 5 failures per (email, IP) and 30 per IP in 15 min → 429 `too_many_attempts` + `Retry-After`; unknown emails throttled the same; `X-Forwarded-For` trusted only from Caddy
 
 **Frontend**
 - [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
