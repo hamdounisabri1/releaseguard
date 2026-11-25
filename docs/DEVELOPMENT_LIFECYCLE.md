@@ -1018,7 +1018,7 @@ The team works in **vertical slices**. Each sprint ends with something working t
 
 ### 14.2 Branching, commits and versioning
 - **Trunk-based development.** `main` is always deployable and protected (PR plus green CI required). Both repos use the ruleset `protect-main` (PR required, squash-merge only, no force-push or deletion, no bypass), applied by [`infra/github/setup-repo.sh`](../infra/README.md#github-repository-settings). Required status checks are added in Sprint 1, once CI exists.
-- Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge within 1–2 days.
+- Short-lived branches: `feat/<scope>-<short-desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. Merge the same day.
 - **Conventional Commits:** `feat(api): block self-approval when policy enabled`. Scopes: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra`, `docs`.
 - **Squash-merge** PRs so `main` has one commit per change.
 - **SemVer tags** for ReleaseGuard releases (`v0.1.0` at the end of Sprint 1, … `v1.0.0` at MVP). Generate the changelog from the commits.
@@ -1030,7 +1030,7 @@ An issue is **Ready** when it has:
 - acceptance criteria, including **failure paths**,
 - the affected areas (`api`, `web`, `db`, …) and any migration needs,
 - no unresolved dependencies,
-- a size small enough to finish in **≤ 2 days**.
+- a size small enough to finish in **≤ 2 h** (re-planned 25 Nov 2026; estimates are in `PROJECT_PLAN.md`).
 
 ### 14.4 Definition of Done (DoD)
 A change is **Done** when:
