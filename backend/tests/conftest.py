@@ -45,6 +45,10 @@ def _test_router() -> APIRouter:
     async def webhooks_extra() -> dict[str, bool]:
         return {"ok": True}
 
+    @router.api_route("/_test/propfind", methods=["PROPFIND"], include_in_schema=False)
+    async def propfind() -> dict[str, bool]:
+        return {"ok": True}
+
     @router.post("/releases/ci")
     async def releases_ci() -> dict[str, bool]:
         return {"ok": True}

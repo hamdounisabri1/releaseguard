@@ -12,7 +12,7 @@ uv run pytest                             # tests
 uv run ruff check . && uv run ruff format --check . && uv run mypy app tests
 ```
 
-Settings come from environment variables, falling back to the repository-root `.env` (copy `.env.example`). `SITE_ORIGIN` is required: without a valid value the app refuses to start. Variables: [guide §14.6](../docs/DEVELOPMENT_LIFECYCLE.md#146-local-development-environment).
+Settings come from environment variables, falling back to the repository-root `.env` (copy `.env.example`). `SITE_ORIGIN` is required: without a valid value the app refuses to start. `ENV` defaults to `production` (fails closed: https only, `CORS_ORIGINS` ignored), so local development sets `ENV=local`. Variables: [guide §14.6](../docs/DEVELOPMENT_LIFECYCLE.md#146-local-development-environment).
 
 ## What exists (SCRUM-18)
 

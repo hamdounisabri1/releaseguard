@@ -12,7 +12,9 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.errors import error_response
 
-UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Default-deny: every method except these read-only ones needs an allowed origin, including
+# POST/PUT/PATCH/DELETE and anything non-standard.
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 # Endpoints that don't use the session cookie, so CSRF doesn't apply: GitHub webhooks are
 # HMAC-verified and CI release registration uses a GitHub OIDC bearer token. Exact method and
@@ -71,7 +73,8 @@ class OriginCheckMiddleware:
     """Reject unsafe requests whose ``Origin`` (or ``Referer``) isn't an allowed origin with 403.
 
     Pure ASGI, so it runs before routing and never buffers bodies. Safe methods, including
-    ``OPTIONS`` preflights, pass through.
+    ``OPTIONS`` preflights, pass through. Only ``http`` scopes are checked: a WebSocket route
+    would need its own Origin check.
     """
 
     def __init__(self, app: ASGIApp, allowed_origins: Iterable[str]) -> None:
@@ -91,7 +94,7 @@ class OriginCheckMiddleware:
 
     def _is_allowed(self, scope: Scope) -> bool:
         method = scope["method"].upper()
-        if method not in UNSAFE_METHODS:
+        if method in SAFE_METHODS:
             return True
         if (method, scope["path"]) in CSRF_EXEMPT:
             return True

@@ -26,7 +26,7 @@ docker compose -f infra/docker-compose.yml up -d db          # Postgres only
 docker compose -f infra/docker-compose.yml up --build        # everything
 
 # Backend (Python 3.12+, uv). Run from backend/; `uv run` uses the project venv.
-# Settings come from env vars or the repo-root .env; SITE_ORIGIN is required (startup fails without it).
+# Settings come from env vars or the repo-root .env; SITE_ORIGIN is required, and ENV defaults to production (set ENV=local).
 cd backend && uv sync                                              # Python 3.12 is pinned in .python-version
 uv run alembic upgrade head && uv run python -m app.scripts.seed   # (planned, SCRUM-19/25) migrate + seed
 uv run uvicorn app.main:app --reload                               # http://localhost:8000/docs

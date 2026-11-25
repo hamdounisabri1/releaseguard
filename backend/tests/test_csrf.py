@@ -72,6 +72,24 @@ async def test_exemption_is_exact_method_and_path(
     _assert_csrf_rejected(response.status_code, response.json())
 
 
+async def test_non_standard_method_needs_an_allowed_origin(client: AsyncClient) -> None:
+    rejected = await client.request("PROPFIND", "/api/v1/_test/propfind")
+    allowed = await client.request(
+        "PROPFIND", "/api/v1/_test/propfind", headers={"Origin": "http://testserver"}
+    )
+
+    _assert_csrf_rejected(rejected.status_code, rejected.json())
+    assert allowed.status_code == 200
+
+
+async def test_duplicate_origin_headers_use_the_first(client: AsyncClient) -> None:
+    response = await client.post(
+        ECHO, headers=[("Origin", "https://evil.example"), ("Origin", "http://testserver")]
+    )
+
+    _assert_csrf_rejected(response.status_code, response.json())
+
+
 async def test_cors_origin_is_refused_outside_local() -> None:
     app = build_app(
         env="production",

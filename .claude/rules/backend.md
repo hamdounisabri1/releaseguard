@@ -33,6 +33,7 @@ paths:
 ## API conventions
 - Prefix `/api/v1`, JSON only, paginated lists.
 - Error shape: `{"error": {"code", "message", "details"}}`. Use 403 for a role failure, 404 for another workspace's resource, 409 for an invalid state or lock conflict, 422 for validation.
+- A 422 returns each error's `msg` as is, so **custom Pydantic validators never put the submitted value in their message** (`raise ValueError("must be a bare origin")`, not `f"{value} is invalid"`): it may be a password or token.
 - `/healthz` (liveness) and `/readyz` (DB reachable) are public.
 - Every state-changing service calls `record_audit(actor, action, target, details)`.
 

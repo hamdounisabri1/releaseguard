@@ -25,7 +25,7 @@ def _parse_origin(value: str) -> str:
     origin = normalize_origin(value)
     if origin is None:
         raise ValueError(
-            f"{value!r} is not a bare origin; use scheme://host[:port] with http or https "
+            "not a bare origin; use scheme://host[:port] with http or https "
             "and no path, query or credentials"
         )
     return origin
@@ -40,7 +40,9 @@ class Settings(BaseSettings):
         frozen=True,
     )
 
-    env: Environment = "local"
+    # Fails closed: an unset ENV means production rules (https SITE_ORIGIN, no CORS_ORIGINS).
+    # Local development sets ENV=local in .env (see .env.example).
+    env: Environment = "production"
     # Public origin of the app (Caddy serves / and /api on it). Required: it drives the CSRF
     # Origin check (ADR-0007).
     site_origin: str
