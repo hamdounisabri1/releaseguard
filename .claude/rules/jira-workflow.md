@@ -22,7 +22,7 @@ This file loads when the plan or a retro is touched. **Read it explicitly** at t
 |---|---|---|
 | **Sprint** (board sprint on `SCRUM board`, id 1) | The sprint's timebox; holds all its Tasks | `Sprint 1: Foundation` |
 | **Epic** | One sprint (groups its Tasks) | `Sprint 1: Foundation` |
-| **Task** | One item from the sprint checklist in `docs/PROJECT_PLAN.md` (≤ 2 days) | `Auth: argon2, sessions, login/logout/me` |
+| **Task** | One item from the sprint checklist in `docs/PROJECT_PLAN.md` (≤ 2 h) | `Auth: argon2, sessions, login/logout/me` |
 | **Sub-task** | An optional step inside a Task | `Write cross-workspace isolation test` |
 | **Task** labelled `type:bug` | Anything found broken during work | `Bug: Viewer can edit environment settings` |
 
@@ -40,7 +40,7 @@ Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plu
 ## 3. Up-front planning: every sprint at once (project-manager role)
 - **Jira first, for the whole project.** Before Sprint 1's work begins, create in one pass: one Epic per sprint (Sprints 1–6; Sprint 0 is Epic SCRUM-5), one Task per checkbox in each sprint's `docs/PROJECT_PLAN.md` checklist, and one board sprint per sprint. Sub-checkboxes (for example under `approval_service`) become acceptance criteria of their parent Task, not separate Tasks.
 - **Only tasks from the plan.** Don't invent tasks that aren't in a sprint checklist. Work found later is added as it turns up (§6).
-- Each Task has a goal, acceptance criteria **including failure paths**, labels (`area:*`, `type:*`, `sprint:N`, `p0|p1|p2`), and an estimate of ≤ 2 days (split anything bigger).
+- Each Task has a goal, acceptance criteria **including failure paths**, labels (`area:*`, `type:*`, `sprint:N`, `p0|p1|p2`), and an estimate in hours of ≤ 2 h (split anything bigger). The estimate is written next to the Task's checkbox in the plan, for example `SCRUM-19 *(2 h)*`.
 - **Show the full proposed list (all sprints) to the user and wait for approval before creating anything.** This one approval covers the bulk creation.
 - After approval:
   1. Create the Epics and Tasks in dependency order (blockers first), parent = the sprint's Epic, then add a Jira **Blocks** link for each dependency edge. No Sub-tasks; they're added later, only if a Task needs them while we work it.
@@ -53,7 +53,7 @@ Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plu
 
 ### Using `/to-tickets` to draft the Tasks
 `/to-tickets` drafts the Tasks for the up-front planning pass. It is user-invoked only. This section is its tracker configuration and overrides the skill where they differ:
-- **Source:** the sprint checklists in `docs/PROJECT_PLAN.md`, plus the lifecycle guide and ADRs for context. Each checkbox becomes one Task. Split a checkbox only when it is over 2 days, and never add slices that aren't in the plan.
+- **Source:** the sprint checklists in `docs/PROJECT_PLAN.md`, plus the lifecycle guide and ADRs for context. Each checkbox becomes one Task. Split a checkbox only when it is over 2 h, and never add slices that aren't in the plan.
 - **Tracker:** Jira `SCRUM` through the `jira` MCP server (REST fallback above). Don't use local `.scratch/` files or GitHub issues.
 - **Each Task:** parent = its sprint's Epic. The body follows the skill's issue template (What to build, Acceptance criteria **including failure paths**, Blocked by). Labels and estimate as above. **Don't** use the skill's `ready-for-agent` label.
 - **Blocking edges:** Jira **Blocks** links, created after the Tasks.
@@ -62,10 +62,10 @@ Labels follow `git-workflow.md`: `area:*`, `type:*`, `sprint:N`, `p0|p1|p2`, plu
 ## 4. Daily planning (Claude, first session of each day)
 At the start of the **first session on a new date** (today differs from the date in `PROJECT_PLAN.md` §5 "Today"), do this before any other work, without being asked:
 1. Read the active sprint's Tasks from Jira (status, Blocks links, `today` label) and the sprint's checklist in the plan.
-2. **Pick today's work:** about one working day (sum of estimates ≈ 1 day), Tasks from the **active sprint only**, unblocked (every blocker Done), in dependency and priority order (`p0` first). Unfinished Tasks from yesterday come first. If nothing in the active sprint is left, say the sprint is ready to close (§7).
+2. **Pick today's work:** about one working day (sum of estimates ≈ 10 h, the plan's daily capacity; follow the day's row in the plan's timetable), Tasks from the **active sprint only**, unblocked (every blocker Done), in dependency and priority order (`p0` first). Unfinished Tasks from yesterday come first. If nothing in the active sprint is left, say the sprint is ready to close (§7).
 3. **Mark them in Jira with the `today` label only:** add `today` to the picks and remove it from anything no longer picked. Don't move issues to or from the backlog, between sprints, or re-rank them for the daily plan; leave status as it is. The user's view of today's work is the JQL `project = SCRUM AND labels = today`.
 4. **Update the plan:** rewrite the "Today" block in `PROJECT_PLAN.md` §5 (date, picks with keys, carried over, blocked, schedule note). Tick any checkbox whose Task is Done but not yet ticked. `main` is protected, so this edit stays uncommitted until the day's first Task branch is created and goes in as its first commit (`git-workflow.md`, "Leave no edit behind on `main`").
-5. **Schedule check:** compare remaining estimates with the working days left in the sprint. If it's behind, say so and propose a fix. The MVP date (Wed 2 Dec 2026) is fixed, so apply the cut list in §6 of the plan in order rather than shifting dates. Change dates or scope only after the user agrees.
+5. **Schedule check:** compare the remaining estimates (hours) with the working hours left in the sprint (09:00–20:00 minus the 13:00–14:00 break). If it's behind by more than the day's buffer, say so and propose a fix. The MVP date (Wed 2 Dec 2026) is fixed, so apply the cut list in §6 of the plan in order rather than shifting dates. Change dates or scope only after the user agrees.
 6. Report in at most 6 lines: today's picks, what carried over, what's blocked, and whether the sprint is on track.
 
 These daily `today` label edits are pre-approved; don't ask before making them.

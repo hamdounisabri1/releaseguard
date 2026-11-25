@@ -2,7 +2,7 @@
 
 ## Branches and commits
 - Trunk-based. `main` is always deployable and protected (PR plus green CI).
-- Short-lived branches: `feat/<scope>-<desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. One Task = one branch = one PR, merged within 1–2 days (Tasks are ≤ 2 days); merge daily when possible. Include the Jira key (project `SCRUM`) when a ticket exists: `feat/SCRUM-12-approval-gate`.
+- Short-lived branches: `feat/<scope>-<desc>`, `fix/…`, `chore/…`, `docs/…`, `test/…`. One Task = one branch = one PR, merged the same day (Tasks are ≤ 2 h since the 25 Nov 2026 re-plan; see the timetable in `docs/PROJECT_PLAN.md` §3). Include the Jira key (project `SCRUM`) when a ticket exists: `feat/SCRUM-12-approval-gate`.
 - **Bulk completion = one PR.** When the user asks to complete Tasks in bulk ("bulk complete", or names more than one Task to finish together), all of them go on **one branch and one PR**: branch `<type>/SCRUM-<first>-<last>-<desc>` (for example `chore/SCRUM-9-10-dev-tooling`), PR title listing every key (`chore(infra): SCRUM-9, SCRUM-10 webhook tunnel and pre-commit`), one commit per Task inside it (each with its own key) so the history stays readable, every Task's checkbox ticked in that same PR, and every Task marked Done once it merges. A single Task named on its own stays on its own PR.
 - **Don't stack Task PRs.** Branch every Task from an up-to-date `main`, never from another unmerged Task branch. Squash-merging the lower PR rewrites its commits, so every PR stacked on it then conflicts. If a stack already exists, after each merge run `git rebase --onto origin/main <old-tip-of-merged-branch> <next-branch>` and force-push it with `--force-with-lease`.
 - Conventional Commits with a scope: `api`, `web`, `worker`, `db`, `github`, `ai`, `infra` or `docs`. Example: `feat(api): block self-approval when policy enabled`. Reference the Jira issue in the commit body or PR title (`SCRUM-12`) so Jira links it.
@@ -27,7 +27,7 @@
 - **Commit on demand:** the user can ask for a commit (or a push) at any time, not only at these points. Claude does it right away: it reviews `git diff --staged` for secrets, writes a Conventional Commit message with the Jira key, and commits on the current Task branch. If the current branch is `main`, it creates the Task branch first, because nothing is committed directly to `main`.
 
 ## Issues (Definition of Ready)
-Issues are Jira tickets in project `SCRUM` (see `jira-workflow.md`). A ticket is Ready when it has a goal, acceptance criteria **including failure paths**, area labels (`area:api|web|worker|db|github|ai|infra|docs`), no blocking dependencies, and a size of **≤ 2 days**. Labels: `type:*`, `sprint:N`, `p0|p1|p2`.
+Issues are Jira tickets in project `SCRUM` (see `jira-workflow.md`). A ticket is Ready when it has a goal, acceptance criteria **including failure paths**, area labels (`area:api|web|worker|db|github|ai|infra|docs`), no blocking dependencies, and an estimate of **≤ 2 h**. Labels: `type:*`, `sprint:N`, `p0|p1|p2`.
 
 ## Definition of Done
 - [ ] Acceptance criteria met, including permission-denied and failure paths
