@@ -1,9 +1,11 @@
 """Plain builders for test data. Each one adds rows to the given session and flushes."""
 
 import uuid
+from functools import lru_cache
 
 from sqlalchemy.orm import Session
 
+from app.core.passwords import hash_password
 from app.core.permissions import Role
 from app.models import Application, Environment, User, Workspace, WorkspaceMember
 from app.models.enums import EnvironmentType
@@ -23,11 +25,18 @@ def make_workspace(db: Session, *, slug: str | None = None) -> Workspace:
     return workspace
 
 
-def make_user(db: Session, *, email: str | None = None) -> User:
+@lru_cache(maxsize=1)
+def default_password_hash() -> str:
+    """argon2id is slow on purpose; hash the shared test password once per run."""
+    return hash_password(DEFAULT_PASSWORD)
+
+
+def make_user(db: Session, *, email: str | None = None, status: str = "active") -> User:
     user = User(
         email=email or f"user-{_suffix()}@example.com",
         display_name="Test User",
-        password_hash="not-a-real-hash",  # noqa: S106 (replaced by argon2id in SCRUM-20)
+        password_hash=default_password_hash(),
+        status=status,
     )
     db.add(user)
     db.flush()
@@ -39,6 +48,13 @@ def make_member(db: Session, workspace: Workspace, user: User, role: Role) -> Wo
     db.add(member)
     db.flush()
     return member
+
+
+def make_workspace_user(db: Session, workspace: Workspace, role: Role) -> User:
+    """A user with an active membership in ``workspace``."""
+    user = make_user(db)
+    make_member(db, workspace, user, role)
+    return user
 
 
 def make_application(db: Session, workspace: Workspace, *, name: str = "TaskFlow") -> Application:

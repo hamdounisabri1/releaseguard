@@ -5,6 +5,7 @@ description = "ReleaseGuard API and the shared code for the worker"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.14",
+    "argon2-cffi>=23.1",
     "fastapi>=0.165.0",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.16.3",

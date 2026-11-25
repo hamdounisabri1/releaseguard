@@ -12,6 +12,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/releaseguard_test"
 )
 
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,8 @@ from app.core.config import Settings
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError
 from app.db.session import create_db_engine
 from app.main import create_app
+from app.services import auth_service
+from app.services.auth_service import SESSION_COOKIE
 
 TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 SITE_ORIGIN = "http://testserver"
@@ -164,3 +167,11 @@ def db_app(db: Session) -> FastAPI:
 async def db_client(db_app: FastAPI) -> AsyncIterator[AsyncClient]:
     async with client_for(db_app) as c:
         yield c
+
+
+def sign_in(client: AsyncClient, db: Session, user_id: uuid.UUID, workspace_id: uuid.UUID) -> str:
+    """Give ``client`` a live session without the (slow) password check. Returns the token."""
+    token = auth_service.create_session(db, user_id, workspace_id)
+    # Set as a plain cookie: the real one is Secure, which httpx won't send to http://testserver.
+    client.cookies.set(SESSION_COOKIE, token)
+    return token
