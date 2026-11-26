@@ -164,7 +164,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [ ] SCRUM-33 *(1 h)* `ci.yml`: Ruff, mypy, pytest (Postgres service), ESLint, `tsc`, `next build`, Alembic check
 
 **Tests**
-- [ ] SCRUM-34 *(1.5 h)* Unit tests for permission rules; API tests for login, RBAC (allowed and denied), **cross-workspace isolation**, a state-changing request with a foreign `Origin` (403), and an `UPDATE` on `audit_logs` being refused
+- [x] SCRUM-34 *(1.5 h)* Unit tests for permission rules; API tests for login, RBAC (allowed and denied), **cross-workspace isolation**, a state-changing request with a foreign `Origin` (403), and an `UPDATE` on `audit_logs` being refused
 
 **Definition of done:** a user signs in, creates TaskFlow and configures its three environments. A Viewer cannot edit. Another workspace's data cannot be reached. CI is green.
 
@@ -341,7 +341,7 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Thu 26 Nov 2026
-- **Done today:** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states
+- **Done today:** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-34 route-wide security sweeps
 - **Today's Tasks:** SCRUM-27 API client and TanStack Query (1 h) · SCRUM-29 shared empty/loading/error/permission-denied components (30 min, unblocks SCRUM-30) · SCRUM-33 CI workflow (1 h) · SCRUM-34 Sprint 1 security tests (1.5 h). Four Tasks, 4 h planned, done in bulk on one branch and one PR (`feat/SCRUM-27-34-web-client-ci-security-tests`).
 - **Carried over:** none
 - **Blocked:** SCRUM-28 (needs SCRUM-27 merged), SCRUM-30 (needs SCRUM-28 and SCRUM-29), SCRUM-31 (needs SCRUM-30)
