@@ -40,6 +40,9 @@ uv run alembic upgrade head && uv run alembic downgrade -1 && uv run alembic upg
 cd frontend && pnpm install && pnpm dev                       # http://localhost:3000 (/ redirects to /dashboard)
 pnpm lint && pnpm typecheck && pnpm build                     # typecheck = next typegen + tsc --noEmit
 pnpm format:check                                             # Prettier (pnpm format to fix)
+pnpm test                                                     # Vitest unit tests
+pnpm api:types                                                # regenerate types/api.ts from the running backend (OPENAPI_URL, or a file path argument)
+cd backend && uv run python -m app.scripts.export_openapi ../openapi.json   # OpenAPI document without a server (CI drift check)
 pnpm dlx shadcn@latest add <component>                        # new shadcn/ui primitive into components/ui/
 uv run --no-project --with pytest pytest .claude/hooks .claude/scripts   # tests for the Claude Code hooks and jira.py
 

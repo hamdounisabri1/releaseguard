@@ -35,6 +35,12 @@ paths:
 - shadcn/ui uses the Radix base with the Nova preset, a slate palette and `cn` from the `cn` package. Dark mode follows the OS (`prefers-color-scheme`). Add primitives with `pnpm dlx shadcn@latest add <name>`, then run `pnpm lint`: generated code must pass the React Compiler rules (`use-mobile.ts` had to be rewritten).
 - Sidebar items come from `lib/navigation.ts`. The only public env var is read in `lib/env.ts`.
 
+## API client (SCRUM-27)
+- Call the backend only through `api` from `services/api.ts` (openapi-fetch, typed by the generated `types/api.ts`), wrapped in `unwrap(...)`, which throws `ApiError {status, code, message, details}`. Area modules (`services/auth.ts`, …) export the fetchers and query keys; components never build URLs.
+- A 401 anywhere sends the browser to `/login?next=…` (`redirectToLogin`); don't handle 401 per page. Queries retry only network errors, 5xx and 429 (`isRetryable` in `lib/query-client.ts`, the same rule `ApiErrorState` uses for its "Try again" button).
+- `types/api.ts` is generated (`pnpm api:types`; the script sorts the document's keys, so the live server and the exported file give the same output), excluded from ESLint and Prettier, and checked against the backend in CI. Regenerate it in the same change as any backend schema or route change.
+- Unit tests: Vitest (`pnpm test`); stub `fetch` with `vi.stubGlobal` and mock `@/lib/env` for an absolute base URL. Component tests add `// @vitest-environment jsdom`.
+
 ## Quality
 - `pnpm lint`, `pnpm typecheck` (runs `next typegen`, then `tsc --noEmit`, so `LayoutProps` exists on a fresh clone) and `pnpm build` must pass. `pnpm format:check` must be clean. No `any` in API-facing code.
 
