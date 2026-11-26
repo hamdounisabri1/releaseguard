@@ -20,6 +20,7 @@ venv/
 htmlcov/
 
 # Node / Next.js
+/openapi.json
 node_modules/
 .next/
 out/

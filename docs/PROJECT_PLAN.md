@@ -153,7 +153,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 **Frontend**
 - [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
-- [ ] SCRUM-27 *(1 h)* API client in `services/`, types generated from OpenAPI (`openapi-typescript`), TanStack Query
+- [x] SCRUM-27 *(1 h)* API client in `services/`, types generated from OpenAPI (`openapi-typescript`), TanStack Query
 - [ ] SCRUM-28 *(1 h)* Login page; auth guard; dashboard placeholder
 - [ ] SCRUM-30 *(1.5 h)* Applications list (search, create, archive) and application details with environments tab
 - [ ] SCRUM-31 *(1 h)* Environment settings form (health URL, expected status, interval, timeout, threshold, verification rule)
@@ -341,7 +341,7 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Thu 26 Nov 2026
-- **Done today:** —
+- **Done today:** SCRUM-27 API client, generated types, TanStack Query
 - **Today's Tasks:** SCRUM-27 API client and TanStack Query (1 h) · SCRUM-29 shared empty/loading/error/permission-denied components (30 min, unblocks SCRUM-30) · SCRUM-33 CI workflow (1 h) · SCRUM-34 Sprint 1 security tests (1.5 h). Four Tasks, 4 h planned, done in bulk on one branch and one PR (`feat/SCRUM-27-34-web-client-ci-security-tests`).
 - **Carried over:** none
 - **Blocked:** SCRUM-28 (needs SCRUM-27 merged), SCRUM-30 (needs SCRUM-28 and SCRUM-29), SCRUM-31 (needs SCRUM-30)
