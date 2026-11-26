@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
+import { Suspense } from "react";
 
 import {
   Sidebar,
@@ -19,7 +20,6 @@ import {
 import { isActivePath, mainNav } from "@/lib/navigation";
 
 export function AppSidebar() {
-  const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   // On mobile the sidebar is a sheet over the page: close it once a link is followed.
   const closeOnMobile = () => {
@@ -46,30 +46,44 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <nav aria-label="Main">
-              <SidebarMenu>
-                {mainNav.map((item) => {
-                  const active = isActivePath(pathname, item.href);
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                        <Link
-                          href={item.href}
-                          aria-current={active ? "page" : undefined}
-                          onClick={closeOnMobile}
-                        >
-                          <item.icon aria-hidden="true" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
+              {/* The pathname is only known at request time (Cache Components): the static
+                  shell has the same links with none active, then the active one streams in. */}
+              <Suspense fallback={<NavItems pathname={null} onNavigate={closeOnMobile} />}>
+                <ActiveNavItems onNavigate={closeOnMobile} />
+              </Suspense>
             </nav>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function ActiveNavItems({ onNavigate }: { onNavigate: () => void }) {
+  return <NavItems pathname={usePathname()} onNavigate={onNavigate} />;
+}
+
+function NavItems({ pathname, onNavigate }: { pathname: string | null; onNavigate: () => void }) {
+  return (
+    <SidebarMenu>
+      {mainNav.map((item) => {
+        const active = pathname !== null && isActivePath(pathname, item.href);
+        return (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                onClick={onNavigate}
+              >
+                <item.icon aria-hidden="true" />
+                <span>{item.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
   );
 }
