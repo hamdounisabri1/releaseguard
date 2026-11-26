@@ -27,12 +27,15 @@ app/
   (app)/layout.tsx        app shell: sidebar + top bar
   (app)/dashboard/        dashboard (placeholder until SCRUM-28)
   (app)/[...slug]/        catch-all → notFound(), so unknown URLs get a 404 inside the shell
-  (app)/not-found.tsx     the 404 page
+  (app)/not-found.tsx     the 404 page (EmptyState)
+  (app)/loading.tsx       skeleton while a page loads (LoadingState)
+  (app)/error.tsx         error boundary for every shell page (ApiErrorState, retry)
 components/
   layout/                 app-sidebar.tsx, top-bar.tsx
   ui/                     shadcn primitives (add with `pnpm dlx shadcn@latest add <name>`)
 hooks/                    use-mobile.ts
   providers/              query-provider.tsx (TanStack Query, in the root layout)
+  states/                 empty, loading, error, permission-denied + ApiErrorState (picks one from an error)
 lib/                      navigation.ts (sidebar items), env.ts, query-client.ts (retry rules), utils.ts
 services/                 every API call: api.ts (typed client, ApiError, 401 → /login), one file per area
 types/api.ts              generated from the backend OpenAPI; never edit by hand

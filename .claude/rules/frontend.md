@@ -19,7 +19,7 @@ paths:
 - The only environment variable available in the browser is `NEXT_PUBLIC_API_BASE_URL`.
 
 ## UI rules
-- Every major screen has **empty, loading, error and permission-denied** states, using shared components.
+- Every major screen has **empty, loading, error and permission-denied** states, using the shared components in `components/states/` (`EmptyState`, `LoadingState`, `ErrorState`, `PermissionDenied`). For a failed query, render `<ApiErrorState error={query.error} onRetry={query.refetch} />`: it maps 401 → redirecting, 403 → permission denied, 404 → not found, 5xx/429 → message + retry, other 4xx → message only, and never shows a non-API error's text. `app/(app)/error.tsx`, `loading.tsx` and `not-found.tsx` use them for the whole shell. Errors stay on screen (`role="alert"`), never only in a toast.
 - Hiding controls by role is a UX nicety only. The backend enforces permissions. Handle 403 and 404 gracefully.
 - Always show **environment and version** next to a deployment status.
 - Keep **deployment status** and **environment health** visually distinct. A deployment can succeed while the app is unhealthy.
@@ -31,6 +31,7 @@ paths:
 
 ## Stack notes (Next.js 16.4, SCRUM-26)
 - **Cache Components and Partial Prefetching are on** (`next.config.ts`). Read the matching guide in `frontend/node_modules/next/dist/docs/` before using a Next.js API (see `frontend/AGENTS.md`); this is also the fallback when context7 isn't available.
+- **Request-time hooks go inside `<Suspense>`.** `usePathname()`, `useSearchParams()` and similar are unknown at prerender, and since `app/(app)/loading.tsx` exists the shell is prerendered as static HTML, so `next build` fails on such a hook outside a boundary. Put only the part that needs the value in a small component behind `<Suspense>` whose fallback renders the same markup without it (see `ActiveNavItems` in `app-sidebar.tsx` and `SectionTitle` in `top-bar.tsx`).
 - Pages that need the app shell go under the `app/(app)/` route group. The root layout stays bare (for `/login`). Unknown URLs hit `app/(app)/[...slug]`, which calls `notFound()`, so a 404 renders inside the shell.
 - shadcn/ui uses the Radix base with the Nova preset, a slate palette and `cn` from the `cn` package. Dark mode follows the OS (`prefers-color-scheme`). Add primitives with `pnpm dlx shadcn@latest add <name>`, then run `pnpm lint`: generated code must pass the React Compiler rules (`use-mobile.ts` had to be rewritten).
 - Sidebar items come from `lib/navigation.ts`. The only public env var is read in `lib/env.ts`.
