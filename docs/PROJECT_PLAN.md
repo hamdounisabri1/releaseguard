@@ -340,13 +340,13 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
-- **Date:** Wed 25 Nov 2026
-- **Done today:** SCRUM-18 Backend skeleton (PR #10) · SCRUM-26 Next.js App Router shell (PR #12) · bulk SCRUM-19…25 (PR #14): SCRUM-19 models + first migration · SCRUM-24 health endpoints, request id, JSON logging · SCRUM-22 `record_audit` · SCRUM-20 auth (argon2id, sessions, login/logout/me) · SCRUM-21 RBAC + scoping · SCRUM-23 application + environment CRUD · SCRUM-25 seed script
-- **Today's Tasks:** bulk SCRUM-19…25 (Thu's 09:00–17:30 backend blocks, started a day early; one PR). SCRUM-22/23 lines corrected to match Jira (22 = audit helper, 23 = CRUD)
+- **Date:** Thu 26 Nov 2026
+- **Done today:** —
+- **Today's Tasks:** SCRUM-27 API client and TanStack Query (1 h) · SCRUM-29 shared empty/loading/error/permission-denied components (30 min, unblocks SCRUM-30) · SCRUM-33 CI workflow (1 h) · SCRUM-34 Sprint 1 security tests (1.5 h). Four Tasks, 4 h planned, done in bulk on one branch and one PR (`feat/SCRUM-27-34-web-client-ci-security-tests`).
 - **Carried over:** none
-- **Blocked:** none
-- **Next:** SCRUM-110 (login throttling, added from the SCRUM-20 review), then SCRUM-27, 28 (API client, login page; see the [timetable](#daily-timetable))
-- **Schedule:** on plan. Re-planned in hours on 25 Nov: 63.25 h of Tasks in 70 h (10 h a day, Thu 26 Nov – Wed 2 Dec), ≈ 5 h buffer. Sprint 1: 9.5 h left of 20 h (SCRUM-26 and the 7.5 h SCRUM-19…25 bulk done a day early, merged in PR #14; SCRUM-110 adds 1.5 h)
+- **Blocked:** SCRUM-28 (needs SCRUM-27 merged), SCRUM-30 (needs SCRUM-28 and SCRUM-29), SCRUM-31 (needs SCRUM-30)
+- **Next:** SCRUM-110 (login throttling, 1.5 h), SCRUM-32 (docker-compose, 30 min), then SCRUM-28 once SCRUM-27 is merged
+- **Schedule:** on plan. Sprint 1 remaining after today: 5.5 h of Tasks (SCRUM-110, 28, 30, 31, 32), inside Fri 27 Nov's 09:00–18:30 blocks plus the buffer. Sprint 1 closes Fri 27 Nov at 18:30 (`v0.1.0`).
 
 ### Labels
 | Group | Labels |
