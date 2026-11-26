@@ -9,7 +9,11 @@ paths:
 # GitHub Actions and GitHub App rules
 
 ## ReleaseGuard's own workflows (`.github/workflows/`)
-- `ci.yml` (all PRs): Ruff, mypy, pytest with a Postgres service, ESLint, `tsc`, `next build`, gitleaks, Alembic check.
+- `ci.yml` (all PRs and pushes to `main`; SCRUM-33): jobs `backend` (Ruff, mypy, Alembic up/down/up + check, pytest with a Postgres service), `frontend` (ESLint, `tsc`, Prettier, Vitest, `next build`), `api-types` (generated `frontend/types/api.ts` matches the backend) and `gitleaks` (full history, checksum-verified binary). The job names are the required checks in `infra/github/ruleset-ci-releaseguard.json`: rename one only together with that file, then re-run `setup-repo.sh`.
+- Triggers: `pull_request` and `push` only. Never `pull_request_target` or `workflow_run` for anything that runs repository code.
+- Top-level `permissions: {}`; each job grants itself only what it needs (`contents: read` for CI). `actions/checkout` always with `persist-credentials: false`.
+- Pin every action (first-party too) to a full commit SHA with the version in a trailing comment, choosing a release at least two weeks old. Pin tool versions (`UV_VERSION`, `GITLEAKS_VERSION`) in the workflow `env:`; download binaries only with checksum verification.
+- No `${{ }}` expressions inside `run:` scripts: pass values through `env:` and use `"$VAR"`. Lint workflows with `uvx --from actionlint-py actionlint`.
 - `release.yml` (main or tags): build images → **Trivy, fail on HIGH/CRITICAL** → push to GHCR → SSH deploy (`compose pull`, `alembic upgrade head`, `up -d`) → smoke test `/healthz`.
 - `nightly.yml` (optional): full Playwright E2E plus a backup restore test.
 - Pin third-party actions to a full commit SHA. Set the minimal `permissions:` per job. Secrets come only from GitHub encrypted secrets.

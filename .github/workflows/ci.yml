@@ -1,0 +1,182 @@
+# CI gates for every pull request and every push to main (SCRUM-33).
+# The four job names below are required status checks on main (infra/github/ruleset-ci-releaseguard.json),
+# so renaming a job means updating that file and re-running infra/github/setup-repo.sh.
+#
+# Hardening (github-actions.md): only pull_request and push triggers (a fork PR gets a read-only
+# token and no secrets), deny-all token by default with contents: read per job, every action
+# pinned to a full commit SHA, no checkout credentials left on disk, no ${{ }} in run: scripts.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.13.7"
+  NODE_VERSION: "22"
+  GITLEAKS_VERSION: "8.30.1"
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          # A throwaway container reachable only from this job: trust auth, so no password
+          # appears anywhere (secret scanners flag even dummy ones).
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: releaseguard_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENV: ci
+      SITE_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql+psycopg://postgres@127.0.0.1:5432/releaseguard_test
+      TEST_DATABASE_URL: postgresql+psycopg://postgres@127.0.0.1:5432/releaseguard_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Ruff
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy app tests
+      - name: Migrations (upgrade, downgrade, upgrade, drift check)
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: pytest
+        run: uv run pytest
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: ESLint
+        run: pnpm lint
+      - name: Types (next typegen + tsc)
+        run: pnpm typecheck
+      - name: Prettier
+        run: pnpm format:check
+      - name: Vitest
+        run: pnpm test
+      - name: next build
+        run: pnpm build
+
+  api-types:
+    # frontend/types/api.ts must match the backend's OpenAPI document (SCRUM-27).
+    name: api-types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      ENV: ci
+      SITE_ORIGIN: http://localhost:3000
+      # The export builds the app without connecting; the URL only has to parse.
+      DATABASE_URL: postgresql+psycopg://127.0.0.1:1/unused
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Export the OpenAPI document
+        working-directory: backend
+        run: |
+          uv sync --locked
+          uv run python -m app.scripts.export_openapi "$RUNNER_TEMP/openapi.json"
+      - name: Regenerate types/api.ts
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm api:types "$RUNNER_TEMP/openapi.json"
+      - name: Fail if the committed types differ
+        run: |
+          if ! git diff --exit-code -- frontend/types/api.ts; then
+            echo "::error file=frontend/types/api.ts::Out of date with the backend. Run 'pnpm api:types' (backend running) and commit the result."
+            exit 1
+          fi
+
+  gitleaks:
+    # pre-commit runs gitleaks on staged changes; this scans the whole history, so a commit
+    # made without the hook (or with --no-verify) can't slip through.
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (checksum-verified)
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "$base/$archive"
+          curl -fsSLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${archive}\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+      - name: Scan the full history
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner --verbose .'
