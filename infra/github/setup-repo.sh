@@ -9,6 +9,7 @@
 # 2. Labels: the set from docs/PROJECT_PLAN.md §5; GitHub's default labels are removed.
 # 3. Ruleset `protect-main` (ruleset-main.json): PR required, rebase-merge only, no force-push,
 #    no deletion, linear history, no bypass actors.
+# 4. Ruleset `ci-required` (ruleset-ci-<repo-name>.json, if present): required CI status checks.
 set -euo pipefail
 
 repo="${1:?usage: setup-repo.sh <owner/repo>}"
@@ -73,6 +74,23 @@ if [[ -n "$ruleset_id" ]]; then
 else
   ruleset_id="$(gh api -X POST "repos/$repo/rulesets" --input "$ruleset_file" --jq '.id')"
   echo "   created ruleset $ruleset_id"
+fi
+
+# Optional per-repo ruleset `ci-required` (ruleset-ci-<repo-name>.json): CI jobs that must pass
+# before a PR can merge. A separate ruleset, so each repo lists its own job names and the shared
+# protect-main file stays the same for both repos.
+ci_ruleset_file="$here/ruleset-ci-${repo#*/}.json"
+ci_ruleset_name="ci-required"
+if [[ -f "$ci_ruleset_file" ]]; then
+  echo "== $repo: ruleset $ci_ruleset_name"
+  ci_ruleset_id="$(gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$ci_ruleset_name\") | .id")"
+  if [[ -n "$ci_ruleset_id" ]]; then
+    gh api -X PUT "repos/$repo/rulesets/$ci_ruleset_id" --input "$ci_ruleset_file" --silent
+    echo "   updated ruleset $ci_ruleset_id"
+  else
+    ci_ruleset_id="$(gh api -X POST "repos/$repo/rulesets" --input "$ci_ruleset_file" --jq '.id')"
+    echo "   created ruleset $ci_ruleset_id"
+  fi
 fi
 
 echo "== $repo: done"

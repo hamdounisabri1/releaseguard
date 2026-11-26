@@ -63,7 +63,7 @@ infra/github/setup-repo.sh hamdounisabri1/taskflow
 
 **Windows dev machine:** both PowerShell 7 and Git Bash work; use the syntax of the shell you're in. If `python` opens the Microsoft Store stub, use `py -3`. `jq` isn't installed; parse JSON with Python.
 
-CI gates that block a merge: Ruff, mypy, ESLint, `tsc`, pytest, Vitest/Playwright, Trivy (`--severity HIGH,CRITICAL --exit-code 1`), gitleaks, Alembic check.
+CI gates that block a merge ([`.github/workflows/ci.yml`](.github/workflows/ci.yml), required on `main` by the `ci-required` ruleset): **backend** (Ruff, mypy, Alembic up/down/up + `alembic check`, pytest on a Postgres 17 service), **frontend** (ESLint, `tsc`, Prettier, Vitest, `next build`), **api-types** (`types/api.ts` matches the backend OpenAPI), **gitleaks** (full history). Planned: Trivy (`--severity HIGH,CRITICAL --exit-code 1`) in `release.yml`, Playwright in `nightly.yml`.
 
 ## Architecture (big picture)
 
