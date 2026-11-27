@@ -58,14 +58,17 @@ function toValues(env: Environment): SettingsValues {
   };
 }
 
-/** Only the fields that differ from the saved environment (a PATCH changes only what it sends). */
+/**
+ * Only the fields the user changed since the form loaded or last saved (`baseline`), never the
+ * difference from a refetched environment: that would send back stale values for fields someone
+ * else changed meanwhile and silently revert them. A PATCH changes only what it sends.
+ */
 export function changedSettings(
-  saved: Environment,
+  baseline: SettingsValues,
   values: SettingsValues,
 ): Partial<SettingsValues> {
-  const current = toValues(saved);
   return Object.fromEntries(
-    Object.entries(values).filter(([key, value]) => current[key as SettingsField] !== value),
+    Object.entries(values).filter(([key, value]) => baseline[key as SettingsField] !== value),
   ) as Partial<SettingsValues>;
 }
 
@@ -75,6 +78,8 @@ export function saveErrorMessage(error: unknown, hasFieldErrors: boolean): strin
   }
   if (error.status === 422) return hasFieldErrors ? null : "Check the highlighted fields.";
   if (error.status === 404) return "This environment no longer exists.";
+  // 409 `application_archived`: the backend's message says why; retrying won't help.
+  if (error.status === 409) return error.message;
   return "The settings couldn't be saved. Try again in a moment.";
 }
 
@@ -88,14 +93,17 @@ export function EnvironmentSettingsForm({ environment }: EnvironmentSettingsForm
   const queryClient = useQueryClient();
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // What the inputs started from. Background refetches of `environment` don't move it.
+  const [baseline, setBaseline] = useState(() => toValues(environment));
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: toValues(environment),
+    defaultValues: baseline,
   });
   const save = useMutation({
     mutationFn: (body: Partial<SettingsValues>) => updateEnvironment(environment.id, body),
     onSuccess: async (updated) => {
       queryClient.setQueryData(environmentQueryKey(updated.id), updated);
+      setBaseline(toValues(updated));
       form.reset(toValues(updated));
       setSaved(true);
       await queryClient.invalidateQueries({ queryKey: applicationsQueryKey });
@@ -114,7 +122,7 @@ export function EnvironmentSettingsForm({ environment }: EnvironmentSettingsForm
   const onSubmit = form.handleSubmit((values) => {
     setFormError(null);
     setSaved(false);
-    const changes = changedSettings(environment, values);
+    const changes = changedSettings(baseline, values);
     if (Object.keys(changes).length === 0) return;
     save.mutate(changes);
   });

@@ -84,19 +84,28 @@ async function replaceValue(label: string, value: string) {
 }
 
 describe("changedSettings", () => {
-  it("keeps only the fields that differ from the saved environment", () => {
-    const values = {
-      expected_status: 200,
-      check_interval_seconds: 30,
-      timeout_ms: 5000,
-      failure_threshold: 3,
-      verify_successes: 5,
-      verify_timeout_seconds: 300,
-    };
-    expect(changedSettings(ENV, values)).toEqual({
+  const BASELINE = {
+    expected_status: 200,
+    check_interval_seconds: 60,
+    timeout_ms: 1000,
+    failure_threshold: 3,
+    verify_successes: 3,
+    verify_timeout_seconds: 300,
+  };
+
+  it("keeps only the fields the user changed from the form's baseline", () => {
+    const values = { ...BASELINE, check_interval_seconds: 30, verify_successes: 5 };
+    expect(changedSettings(BASELINE, values)).toEqual({
       check_interval_seconds: 30,
       verify_successes: 5,
     });
+  });
+
+  it("doesn't send back a field someone else changed meanwhile", () => {
+    // The form loaded timeout_ms 1000; another Admin has since saved 2000 (the refetched
+    // environment says so). This user only edits the interval: timeout_ms must not be sent.
+    const values = { ...BASELINE, check_interval_seconds: 30 };
+    expect(changedSettings(BASELINE, values)).toEqual({ check_interval_seconds: 30 });
   });
 });
 
@@ -226,16 +235,52 @@ describe("EnvironmentSettings", () => {
     expect(await screen.findByText("Not found")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
   });
+
+  it("shows an archived application's environment as not editable", async () => {
+    params = { applicationId: "a1", environmentId: "e-prod" };
+    stubApi(
+      routes("admin", {
+        "GET /api/v1/applications/a1": {
+          status: 200,
+          body: { ...APP, status: "archived", archived_at: "2026-11-27T10:00:00Z" },
+        },
+      }),
+    );
+    renderWithClient(<EnvironmentSettings />);
+    expect(await screen.findByText("This application is archived")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
+  });
+
+  it("shows the backend's reason when the save conflicts (409)", async () => {
+    params = { applicationId: "a1", environmentId: "e-prod" };
+    stubApi(
+      routes("admin", {
+        "PATCH /api/v1/environments/e-prod": errorReply(
+          409,
+          "application_archived",
+          "The application is archived.",
+        ),
+      }),
+    );
+    renderWithClient(<EnvironmentSettings />);
+    await screen.findByLabelText("Timeout (ms)");
+    const user = await replaceValue("Timeout (ms)", "2000");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("The application is archived.");
+  });
 });
 
 describe("Configure link", () => {
   it.each([
-    ["admin", 1],
-    ["developer", 0],
-  ] as const)("is shown to %s: %i", async (role, count) => {
+    ["admin", "active", 1],
+    ["developer", "active", 0],
+    ["admin", "archived", 0],
+  ] as const)("for %s on an %s application: %i", async (role, status, count) => {
     params = { applicationId: "a1" };
     stubApi(
       routes(role, {
+        "GET /api/v1/applications/a1": { status: 200, body: { ...APP, status } },
         "GET /api/v1/applications/a1/environments": { status: 200, body: [ENV] },
       }),
     );

@@ -89,16 +89,18 @@ export function ApplicationsList() {
 
       {query.isPending ? (
         <LoadingState label="Loading applications…" />
-      ) : query.isError ? (
+      ) : query.data === undefined ? (
+        // Only when nothing has loaded: a failed background refetch keeps the list (frontend.md).
         <ApiErrorState error={query.error} onRetry={() => void query.refetch()} />
       ) : query.data.items.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No applications yet"
+          title={includeArchived ? "No applications yet" : "No active applications"}
           description={
-            canManage
+            (includeArchived ? "" : "Archived ones show with Show archived. ") +
+            (canManage
               ? "Use New application to link a GitHub repository and its environments."
-              : "An Admin or Developer can create the first one."
+              : "An Admin or Developer can create one.")
           }
         />
       ) : visible.length === 0 ? (
@@ -162,6 +164,13 @@ export function ApplicationsList() {
           </Table>
         </div>
       )}
+      {query.data && query.data.total > query.data.items.length ? (
+        // The API has no search yet, so the list (and its search) covers one page only.
+        <p className="text-sm text-muted-foreground">
+          Showing the first {query.data.items.length} of {query.data.total} applications; search
+          covers only these.
+        </p>
+      ) : null}
     </>
   );
 }
