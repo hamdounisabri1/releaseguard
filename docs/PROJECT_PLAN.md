@@ -340,13 +340,13 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
-- **Date:** Thu 26 Nov 2026
-- **Done today:** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-34 route-wide security sweeps · SCRUM-33 CI workflow and required checks
-- **Today's Tasks:** SCRUM-27 API client and TanStack Query (1 h) · SCRUM-29 shared empty/loading/error/permission-denied components (30 min, unblocks SCRUM-30) · SCRUM-33 CI workflow (1 h) · SCRUM-34 Sprint 1 security tests (1.5 h). Four Tasks, 4 h planned, done in bulk on one branch and one PR (`feat/SCRUM-27-34-web-client-ci-security-tests`).
+- **Date:** Fri 27 Nov 2026
+- **Done yesterday (merged in PR #17):** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-33 CI workflow and required checks · SCRUM-34 route-wide security sweeps
+- **Today's Tasks:** SCRUM-110 login throttling (1.5 h) · SCRUM-32 local docker-compose (30 min) · SCRUM-28 login page, auth guard, dashboard placeholder (1 h) · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Five Tasks, 5.5 h planned; SCRUM-30 and SCRUM-31 follow SCRUM-28 in the same session.
 - **Carried over:** none
-- **Blocked:** SCRUM-28 (needs SCRUM-27 merged), SCRUM-30 (needs SCRUM-28 and SCRUM-29), SCRUM-31 (needs SCRUM-30)
-- **Next:** SCRUM-110 (login throttling, 1.5 h), SCRUM-32 (docker-compose, 30 min), then SCRUM-28 once SCRUM-27 is merged
-- **Schedule:** on plan. Sprint 1 remaining after today: 5.5 h of Tasks (SCRUM-110, 28, 30, 31, 32), inside Fri 27 Nov's 09:00–18:30 blocks plus the buffer. Sprint 1 closes Fri 27 Nov at 18:30 (`v0.1.0`).
+- **Blocked:** none at the start of the day (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)
+- **Next:** SCRUM-110 and SCRUM-32 first (independent), then SCRUM-28 → SCRUM-30 → SCRUM-31; the sprint closes when SCRUM-31 is Done
+- **Schedule:** on plan. 5.5 h of Tasks inside Fri 27 Nov's 09:00–18:30 blocks plus the buffer. Sprint 1 closes today at 18:30 (`v0.1.0`).
 
 ### Labels
 | Group | Labels |
