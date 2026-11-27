@@ -15,7 +15,7 @@ paths:
 - Put all API calls in `services/`, using types **generated from the backend OpenAPI** (`openapi-typescript`) in `types/`. Don't hand-write API response types.
 - Fetch data with TanStack Query. Poll active deployments (Queued, Deploying, Verifying) until they reach a terminal state.
 - Forms: React Hook Form + Zod. The backend validates again, and its 422 errors are shown next to the matching field.
-- Sessions use an `HttpOnly` cookie. Never read or store tokens in JS. In production the API is same-origin (`/api/v1` behind Caddy); send requests with `credentials: "include"` so local dev on separate ports works too.
+- Sessions use an `HttpOnly` cookie. Never read or store tokens in JS (see "Auth" below). In production the API is same-origin (`/api/v1` behind Caddy); send requests with `credentials: "include"` so local dev on separate ports works too.
 - The only environment variable available in the browser is `NEXT_PUBLIC_API_BASE_URL`.
 
 ## UI rules
@@ -41,6 +41,14 @@ paths:
 - A 401 anywhere sends the browser to `/login?next=…` (`redirectToLogin`); don't handle 401 per page. Queries retry only network errors, 5xx and 429 (`isRetryable` in `lib/query-client.ts`, the same rule `ApiErrorState` uses for its "Try again" button).
 - `types/api.ts` is generated (`pnpm api:types`; the script sorts the document's keys, so the live server and the exported file give the same output), excluded from ESLint and Prettier, and checked against the backend in CI. Regenerate it in the same change as any backend schema or route change.
 - Unit tests: Vitest (`pnpm test`); stub `fetch` with `vi.stubGlobal` and mock `@/lib/env` for an absolute base URL. Component tests add `// @vitest-environment jsdom`.
+
+## Auth (SCRUM-28)
+- Two layers, neither of them authorization (the backend enforces every permission): **`proxy.ts`** (Next 16 Proxy, formerly middleware) only checks that the `rg_session` cookie *exists* and sends visitors without one to `/login?next=…`; **`AuthGuard`** (`components/auth/`, wrapping the `(app)` page content) shows the page only after `GET /auth/me` succeeds, which catches expired or forged cookies. Never read `cookies()` in a Server Component for this: it would make the prerendered shell dynamic.
+- The current user comes from one query, `useQuery(meQueryOptions)` (`services/auth.ts`); never fetch `/auth/me` another way.
+- Every `?next=` value goes through `safeNextPath` (`lib/auth-routes.ts`): same-site paths only (no `//host`, `/\host`, absolute URLs or `/login`), else `/dashboard`, checked on the input **and** on the normalized result (`/..//evil.example` normalizes to `//evil.example`). That keeps the login page from becoming an open redirect.
+- `AuthGuard` renders the page whenever `/auth/me` data exists: a failed *background* refetch must not replace a page (and unsaved input) with an error.
+- Sign-out calls `logout()`, then does a full page load to `/login`, so no cached query of the old session survives. Only success or a 401 counts as signed out; any other failure keeps the user on the page with an alert (the session is still alive).
+- The frontend and API must share a host in dev (`localhost:3000` and `localhost:8000`, not `127.0.0.1` for one of them): the host-only session cookie has to reach `proxy.ts`. If it doesn't, the login page's "already signed in" redirect would bounce off the proxy forever; `lib/login-redirect.ts` detects the bounce and shows a message instead.
 
 ## Quality
 - `pnpm lint`, `pnpm typecheck` (runs `next typegen`, then `tsc --noEmit`, so `LayoutProps` exists on a fresh clone) and `pnpm build` must pass. `pnpm format:check` must be clean. No `any` in API-facing code.
