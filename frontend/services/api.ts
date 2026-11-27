@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from "openapi-fetch";
 
+import { LOGIN_PATH } from "@/lib/auth-routes";
 import { apiBaseUrl } from "@/lib/env";
 import type { components, paths } from "@/types/api";
 
@@ -19,7 +20,7 @@ export class ApiError extends Error {
   }
 }
 
-export const LOGIN_PATH = "/login";
+export { LOGIN_PATH };
 
 /**
  * The generated paths already start with `/api/v1`, so the client's base URL is what comes
