@@ -21,9 +21,10 @@ ReleaseGuard is a **deployment approval and rollback manager** for small teams. 
 uv tool install pre-commit && pre-commit install
 pre-commit run --all-files                                    # every hook on the whole repo (gitleaks still scans only staged changes)
 
-# Local stack
-docker compose -f infra/docker-compose.yml up -d db          # Postgres only
-docker compose -f infra/docker-compose.yml up --build        # everything
+# Local stack (SCRUM-32; settings from the repo-root .env, which needs POSTGRES_PASSWORD; all ports on 127.0.0.1)
+docker compose -f infra/docker-compose.yml up -d db                # Postgres 17 only (creates releaseguard + releaseguard_test)
+docker compose -f infra/docker-compose.yml up -d --wait            # db + backend (migrates + seeds, :8000) + frontend (:3000), hot reload
+docker compose -f infra/docker-compose.yml down                    # stop (add -v to drop the data volumes)
 
 # Backend (Python 3.12+, uv). Run from backend/; `uv run` uses the project venv.
 # Settings come from env vars or the repo-root .env; SITE_ORIGIN is required, and ENV defaults to production (set ENV=local).

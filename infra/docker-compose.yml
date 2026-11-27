@@ -1,0 +1,126 @@
+# Local development stack (SCRUM-32): db, backend, frontend. Not for production (SCRUM-94).
+#
+#   docker compose -f infra/docker-compose.yml up -d db   # Postgres only (run the apps on the host)
+#   docker compose -f infra/docker-compose.yml up         # everything, with hot reload
+#
+# Configuration comes from the repo-root .env (git-ignored; copy .env.example) through env_file.
+# This file holds no secrets: the Postgres password is POSTGRES_PASSWORD there. Compose's own
+# ${...} interpolation reads infra/.env or the shell, not the root .env, so it's used only for
+# the optional host ports (DB_PORT, BACKEND_PORT, FRONTEND_PORT) and NEXT_PUBLIC_API_BASE_URL;
+# `$$` defers a variable to the container's shell. Every port binds to 127.0.0.1 only.
+# The worker joins once `python -m app.worker` exists.
+name: releaseguard
+
+services:
+  db:
+    image: postgres:17-alpine # the major version CI tests against
+    # POSTGRES_PASSWORD (required; the image refuses to start without it) and POSTGRES_USER.
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      POSTGRES_DB: releaseguard
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # First start only: also creates releaseguard_test for `uv run pytest`.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-postgres}\" -d releaseguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: ghcr.io/astral-sh/uv:0.13.9-python3.12-trixie-slim
+    working_dir: /app
+    # Migrate, seed (idempotent; local users and TaskFlow), then serve with reload.
+    # DATABASE_URL is rebuilt for host `db` (the .env one points at 127.0.0.1), with no password
+    # in it: libpq takes it from PGPASSWORD. Both exist only in this command's shell, so a
+    # `compose exec` shell lacks them: restart the service to re-run migrations or the seed.
+    # SITE_ORIGIN and CORS_ORIGINS default to the frontend on :3000. --no-proxy-headers: only
+    # the app's TRUSTED_PROXIES decides whether X-Forwarded-For is believed (login throttle).
+    command:
+      - sh
+      - -c
+      - >-
+        export
+        PGPASSWORD="$${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
+        DATABASE_URL="postgresql+psycopg://$${POSTGRES_USER:-postgres}@db:5432/releaseguard"
+        SITE_ORIGIN="$${SITE_ORIGIN:-http://localhost:3000}"
+        CORS_ORIGINS="$${CORS_ORIGINS-http://localhost:3000}" &&
+        uv sync --frozen && uv run alembic upgrade head && uv run python -m app.scripts.seed &&
+        exec uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-proxy-headers
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      ENV: local
+      # The venv lives outside the bind mount, so it never mixes with a host (Windows) .venv.
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      UV_LINK_MODE: copy
+    volumes:
+      - ../backend:/app
+      - backend-venv:/opt/venv
+      - uv-cache:/root/.cache/uv
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - /opt/venv/bin/python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  frontend:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: >-
+      sh -c "corepack enable && pnpm install --frozen-lockfile &&
+      exec pnpm dev --hostname 0.0.0.0 --port 3000"
+    environment:
+      # Read by the browser, so it names the host-side backend port.
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      # Keep pnpm's store in its own volume; by default it lands in the bind-mounted frontend/.
+      npm_config_store_dir: /pnpm-store
+      # Bind mounts from a Windows or macOS host don't deliver file events; poll instead.
+      WATCHPACK_POLLING: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ../frontend:/app
+      - frontend-node-modules:/app/node_modules
+      - frontend-next:/app/.next
+      - pnpm-store:/pnpm-store
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    healthcheck:
+      # Healthy once the dev server answers (the first start runs `pnpm install` first).
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.status < 500 ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 30s
+      retries: 60
+      start_period: 120s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  backend-venv:
+  uv-cache:
+  frontend-node-modules:
+  frontend-next:
+  pnpm-store:
