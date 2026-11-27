@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
@@ -86,3 +87,25 @@ class UserSession(Base):
     created_at: Mapped[CreatedAt]
     last_seen_at: Mapped[Timestamp]  # the idle timeout counts from here
     expires_at: Mapped[Timestamp]  # absolute expiry
+
+
+class LoginAttempt(Base):
+    """One login attempt, kept 24 h for throttling (SCRUM-110). Never holds a password.
+
+    ``email`` is the normalized (trimmed, lowercased) address as submitted, whether or not an
+    account has it, so unknown emails are throttled exactly like known ones. ``client_ip`` is
+    the throttling key: an IPv4 address, or the /64 network of an IPv6 one.
+    """
+
+    __tablename__ = "login_attempts"
+    __table_args__ = (
+        Index("ix_login_attempts_email_client_ip_created_at", "email", "client_ip", "created_at"),
+        Index("ix_login_attempts_client_ip_created_at", "client_ip", "created_at"),
+        Index("ix_login_attempts_created_at", "created_at"),
+    )
+
+    id: Mapped[UuidPk]
+    email: Mapped[str] = mapped_column(String(254))
+    client_ip: Mapped[str] = mapped_column(String(64))
+    succeeded: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[CreatedAt]

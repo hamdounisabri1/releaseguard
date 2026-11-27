@@ -82,7 +82,7 @@ export interface paths {
         put?: never;
         /**
          * Sign in with email and password
-         * @description Sets the `rg_session` cookie (HttpOnly, Secure, SameSite=Lax). Wrong password, unknown email and disabled account all return the same 401 `invalid_credentials`.
+         * @description Sets the `rg_session` cookie (HttpOnly, Secure, SameSite=Lax). Wrong password, unknown email and disabled account all return the same 401 `invalid_credentials`. After too many failures for one (email, client IP), or from one client IP, within the throttle window it returns 429 `too_many_attempts` with `Retry-After`, the same for known and unknown emails.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -451,7 +451,10 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "unknown" | "healthy" | "unhealthy";
-        /** LoginRequest */
+        /**
+         * LoginRequest
+         * @description ``email`` arrives trimmed and lowercased, the form it's stored and throttled in.
+         */
         LoginRequest: {
             /** Email */
             email: string;
@@ -933,6 +936,17 @@ export interface operations {
             /** @description Validation error. */
             422: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed attempts; retry after `Retry-After` seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds until a new attempt is allowed. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {

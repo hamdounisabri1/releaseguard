@@ -530,6 +530,13 @@ erDiagram
         timestamptz expires_at
         timestamptz last_seen_at
     }
+    login_attempts {
+        uuid id PK
+        string email "normalized, as submitted"
+        string client_ip "IPv4, or IPv6 /64"
+        bool succeeded
+        timestamptz created_at
+    }
     integrations {
         uuid id PK
         uuid workspace_id FK
@@ -703,7 +710,7 @@ Two infrastructure tables sit outside the diagram:
 - **Transactions** wrap "decision + transition + dispatch job" and every other state change with the jobs it implies.
 - **All timestamps are stored in UTC** (`timestamptz`) and rendered in the user's local timezone.
 - **Idempotency:** webhook deliveries by `delivery_id`; deployment requests by `Idempotency-Key`; jobs by `dedupe_key`; CI release registration by `(application_id, version)` (same digest → 200, different digest → 409).
-- **Retention:** scheduled `health_checks` older than 14 days and `done` jobs older than 7 days are deleted by the worker. Nothing else is deleted.
+- **Retention:** scheduled `health_checks` older than 14 days and `done` jobs older than 7 days are deleted by the worker; `login_attempts` older than 24 h are deleted on the login path (SCRUM-110). Nothing else is deleted.
 
 > **Auditability principle:** never update a failed deployment to "successful" when a rollback happens. Keep the failure as history, create a **new** rollback deployment, and link the two. Records describe what actually happened.
 
@@ -776,7 +783,7 @@ Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset
 
 | Area | Method & path | Purpose | Min. role |
 |---|---|---|---|
-| Auth | `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management | public / any |
+| Auth | `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management; login is throttled (429 `too_many_attempts` + `Retry-After`) | public / any |
 | Workspace | `GET /workspace` · `PATCH /workspace/settings` · `GET/POST/PATCH/DELETE /workspace/members[/{id}]` | Workspace, `block_self_approval`, members | Viewer / Admin |
 | Dashboard | `GET /dashboard/summary?from=&to=` | Summary cards, environment matrix, recent activity | Viewer |
 | Applications | `GET/POST /applications` · `GET/PATCH /applications/{id}` · `POST /applications/{id}/archive` | Application CRUD | Viewer / Developer |
@@ -794,7 +801,7 @@ Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset
 | Audit | `GET /audit-logs?target_type=&target_id=&actor=` | Audit trail | Viewer |
 | Ops | `GET /healthz` · `GET /readyz` | Liveness and readiness of ReleaseGuard itself | public |
 
-**Conventions:** JSON everywhere; cursor or page pagination on lists; errors use the shape `{ "error": { "code", "message", "details" } }` (`ErrorResponse` in OpenAPI). `code` is stable and machine-readable: `validation_error` (422; `details.errors` lists `loc`, `msg` and `type`, never the submitted input), `csrf_origin_mismatch` (403), `internal_error` (500; no exception text), plain-status codes such as `not_found` or `method_not_allowed`, and domain codes such as `environment_busy`. Status codes: `401` missing or invalid session, signature or OIDC token; `403` role failure, self-approval, or a foreign `Origin` on a state-changing request; `404` for resources in other workspaces (never confirm they exist); `409` invalid transition, an environment that already has an active deployment, a stale request, or a duplicate decision; `422` validation and ineligible targets. Endpoints that trigger GitHub, health or AI work return `202` with the deployment or job reference; the work happens in the worker.
+**Conventions:** JSON everywhere; cursor or page pagination on lists; errors use the shape `{ "error": { "code", "message", "details" } }` (`ErrorResponse` in OpenAPI). `code` is stable and machine-readable: `validation_error` (422; `details.errors` lists `loc`, `msg` and `type`, never the submitted input), `csrf_origin_mismatch` (403), `internal_error` (500; no exception text), plain-status codes such as `not_found` or `method_not_allowed`, and domain codes such as `environment_busy`. Status codes: `401` missing or invalid session, signature or OIDC token; `403` role failure, self-approval, or a foreign `Origin` on a state-changing request; `404` for resources in other workspaces (never confirm they exist); `409` invalid transition, an environment that already has an active deployment, a stale request, or a duplicate decision; `422` validation and ineligible targets; `429` login throttled (`too_many_attempts`, with `Retry-After`). Endpoints that trigger GitHub, health or AI work return `202` with the deployment or job reference; the work happens in the worker.
 
 ---
 
@@ -964,7 +971,7 @@ Store the provider and model identifier, creation timestamp, related deployment 
 ReleaseGuard has authority over production release decisions, so security is part of the architecture from the start.
 
 ### 13.1 Authentication and authorization
-- Server-side sessions in Postgres: the cookie holds a random id, the table stores its hash; idle timeout 12 h, absolute 7 days, rotated on login ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md)). Passwords hashed with argon2id.
+- Server-side sessions in Postgres: the cookie holds a random id, the table stores its hash; idle timeout 12 h, absolute 7 days, rotated on login ([ADR-0007](adr/0007-server-side-sessions-and-csrf.md)). Passwords hashed with argon2id. **Login throttling** (`login_attempts` in Postgres): at most 5 failures per (email, client IP) and 30 per client IP in 15 min, checked before the account lookup, so the 429 `too_many_attempts` (with `Retry-After`) is identical for known and unknown emails; a success clears that (email, IP) count. The client IP is the socket peer, or `X-Forwarded-For` only when the peer is in `TRUSTED_PROXIES` (Caddy; required in production, and uvicorn runs with `--no-proxy-headers`). A success restarts that (email, IP) count without refunding the per-IP budget. Accepted residual risk: there's no per-account cap across IPs (that would let strangers lock users out), so a botnet or a large IPv6 allocation (bucketed per /64) gets 5 tries per bucket per window.
 - **CSRF:** one origin through Caddy, `SameSite=Lax` cookie, and an Origin check on every unsafe method (403 on mismatch). The webhook and OIDC endpoints are exempt because they don't use cookies.
 - Check workspace membership on **every** operation, and run RBAC checks in the **service layer**.
 - Use short-lived, least-privilege GitHub credentials (installation tokens).
@@ -1070,7 +1077,7 @@ For a solo developer, **self-review the diff the next day** before merging, and 
 cp .env.example .env                 # fill in local values
 docker compose -f infra/docker-compose.yml up -d db   # Postgres only
 cd backend && uv sync && uv run alembic upgrade head && uv run python -m app.scripts.seed
-uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
+uv run uvicorn app.main:app --reload --no-proxy-headers   # http://localhost:8000/docs
 uv run python -m app.worker                 # worker (second terminal)
 cd ../frontend && pnpm install && pnpm dev   # http://localhost:3000
 # or everything at once:
@@ -1094,6 +1101,8 @@ docker compose -f infra/docker-compose.yml up --build
 | `HEALTH_CHECK_ALLOW_PRIVATE` | worker | `true` only in local dev, to allow health URLs on private addresses (default `false`) |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | worker | AI can be disabled by leaving the key empty |
 | `NEXT_PUBLIC_API_BASE_URL` | frontend | The only public variable (`/api/v1` behind Caddy) |
+| `LOGIN_MAX_FAILURES_PER_ACCOUNT`, `LOGIN_MAX_FAILURES_PER_IP`, `LOGIN_THROTTLE_WINDOW_SECONDS` | backend | Login throttling (defaults 5, 30, 900 s) |
+| `TRUSTED_PROXIES` | backend | Comma-separated IPs/CIDRs of the reverse proxy (Caddy) whose `X-Forwarded-For` gives the client IP. Empty: the socket peer is used. **Required in production** (a warning is logged without it). Never `*`; run uvicorn with `--no-proxy-headers` |
 | `CORS_ORIGINS`, `LOG_LEVEL`, `ENV` | backend | `CORS_ORIGINS` is used only when `ENV=local` (frontend and API on different ports) |
 
 ### 14.7 Environments for ReleaseGuard itself

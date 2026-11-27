@@ -11,6 +11,7 @@ paths:
 
 ## Images
 - Multi-stage Dockerfiles for backend, worker and frontend (`output: "standalone"`). Run as a **non-root** user. Use a slim base pinned to a version.
+- The backend runs `uvicorn … --no-proxy-headers`; production sets `TRUSTED_PROXIES` to Caddy's address or network (login throttling keys on the client IP, see `security.md`).
 - No secrets in images or build args. Configuration comes from environment variables at runtime.
 - Every image must pass Trivy with no HIGH/CRITICAL findings before it's pushed.
 

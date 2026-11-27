@@ -149,7 +149,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [x] SCRUM-23 *(1.5 h)* Application CRUD and archive; environment CRUD (auto-create dev, staging and prod with default policies: dev auto-deploy, staging promote from dev, prod requires approval and promotes from staging)
 - [x] SCRUM-24 *(30 min)* `/healthz` and `/readyz`; request-ID middleware; structlog JSON logging
 - [x] SCRUM-25 *(30 min)* Seed script (1 workspace, 4 users, TaskFlow app)
-- [ ] SCRUM-110 *(1.5 h)* Login throttling (found in SCRUM-20): `login_attempts` table, 5 failures per (email, IP) and 30 per IP in 15 min → 429 `too_many_attempts` + `Retry-After`; unknown emails throttled the same; `X-Forwarded-For` trusted only from Caddy
+- [x] SCRUM-110 *(1.5 h)* Login throttling (found in SCRUM-20): `login_attempts` table, 5 failures per (email, IP) and 30 per IP in 15 min → 429 `too_many_attempts` + `Retry-After`; unknown emails throttled the same; `X-Forwarded-For` trusted only from Caddy
 
 **Frontend**
 - [x] SCRUM-26 *(1 h)* Next.js App Router + TypeScript + Tailwind + shadcn/ui; layout with sidebar and top bar
@@ -342,6 +342,7 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Fri 27 Nov 2026
 - **Done yesterday (merged in PR #17):** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-33 CI workflow and required checks · SCRUM-34 route-wide security sweeps
+- **Done today:** SCRUM-110 login throttling
 - **Today's Tasks:** SCRUM-110 login throttling (1.5 h) · SCRUM-32 local docker-compose (30 min) · SCRUM-28 login page, auth guard, dashboard placeholder (1 h) · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Five Tasks, 5.5 h planned; SCRUM-30 and SCRUM-31 follow SCRUM-28 in the same session.
 - **Carried over:** none
 - **Blocked:** none at the start of the day (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)

@@ -2,12 +2,13 @@
 
 from app.models.applications import Application, Environment
 from app.models.audit import AuditLog
-from app.models.identity import User, UserSession, Workspace, WorkspaceMember
+from app.models.identity import LoginAttempt, User, UserSession, Workspace, WorkspaceMember
 
 __all__ = [
     "Application",
     "AuditLog",
     "Environment",
+    "LoginAttempt",
     "User",
     "UserSession",
     "Workspace",

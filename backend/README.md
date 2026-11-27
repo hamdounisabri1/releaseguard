@@ -7,7 +7,7 @@ FastAPI API and the shared code for the worker (Python 3.12, managed with `uv`).
 ```bash
 cd backend
 uv sync                                   # creates .venv (uv downloads Python 3.12 if needed)
-uv run uvicorn app.main:app --reload      # http://localhost:8000/docs
+uv run uvicorn app.main:app --reload --no-proxy-headers   # http://localhost:8000/docs
 uv run alembic upgrade head               # migrate DATABASE_URL
 uv run python -m app.scripts.seed         # local data (idempotent; refuses ENV=production)
 uv run pytest                             # tests (Postgres at TEST_DATABASE_URL)
