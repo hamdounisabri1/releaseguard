@@ -127,3 +127,27 @@ def test_cors_origins_only_widen_allowed_origins_in_local() -> None:
     assert local.cors_enabled
     assert prod.allowed_origins == {"https://rg.example.com"}
     assert not prod.cors_enabled
+
+
+def test_login_throttle_defaults() -> None:
+    settings = Settings(_env_file=None, site_origin="https://rg.example.com")
+
+    assert settings.login_max_failures_per_account == 5
+    assert settings.login_max_failures_per_ip == 30
+    assert settings.login_throttle_window_seconds == 900
+    assert settings.trusted_proxies == []
+
+
+def test_trusted_proxies_parse_from_a_comma_separated_list(
+    monkeypatch: pytest.MonkeyPatch, no_env_file: None
+) -> None:
+    monkeypatch.setenv("SITE_ORIGIN", "https://rg.example.com")
+    monkeypatch.setenv("TRUSTED_PROXIES", "172.18.0.0/16, 10.0.0.5")
+
+    assert Settings().trusted_proxies == ["172.18.0.0/16", "10.0.0.5/32"]
+
+
+@pytest.mark.parametrize("value", ["*", "caddy", "10.0.0.0/33"])
+def test_trusted_proxies_reject_anything_but_addresses(value: str) -> None:
+    with pytest.raises(ValidationError, match="IP address or CIDR"):
+        Settings(_env_file=None, site_origin="https://rg.example.com", trusted_proxies=[value])

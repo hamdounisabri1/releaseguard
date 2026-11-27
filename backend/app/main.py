@@ -2,12 +2,13 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.health import router as health_router
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
-from app.core.logging import configure_logging
+from app.core.logging import configure_logging, get_logger
 from app.core.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from app.core.security import OriginCheckMiddleware
 from app.db.session import create_db_engine, create_session_factory
@@ -47,6 +48,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     # Outermost, so every response (a CSRF 403 or a CORS preflight too) carries the request id.
     app.add_middleware(RequestIdMiddleware)
+    # Outermost of all: the client address comes from X-Forwarded-For only when the socket peer
+    # is a configured proxy (Caddy); anyone else's header is ignored. Login throttling keys on it.
+    # Run uvicorn with --no-proxy-headers: its CLI otherwise trusts X-Forwarded-For from
+    # loopback on its own, whatever TRUSTED_PROXIES says.
+    if settings.trusted_proxies:
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxies)
+    elif settings.env == "production":
+        # Behind Caddy every request would come from the proxy's address, so all clients would
+        # share one login-throttle bucket: a few bad passwords would lock everyone out.
+        get_logger(__name__).warning(
+            "TRUSTED_PROXIES is empty in production: the login throttle keys every client on "
+            "the reverse proxy's address; set it to Caddy's address or network"
+        )
 
     app.include_router(health_router)
     app.include_router(api_router)

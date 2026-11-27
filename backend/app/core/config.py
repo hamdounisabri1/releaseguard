@@ -4,6 +4,7 @@ A missing or invalid required setting raises ``pydantic.ValidationError`` when `
 built, which happens when ``app.main`` is imported, so the API refuses to start.
 """
 
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -53,6 +54,14 @@ class Settings(BaseSettings):
     # API on different ports). Comma-separated in the environment.
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     log_level: LogLevel = "INFO"
+    # Login throttling (SCRUM-110): failures allowed per (email, client IP) and per client IP
+    # within the window before /auth/login answers 429.
+    login_max_failures_per_account: int = Field(default=5, ge=1, le=1000)
+    login_max_failures_per_ip: int = Field(default=30, ge=1, le=10_000)
+    login_throttle_window_seconds: int = Field(default=900, ge=60, le=86_400)
+    # Peers whose X-Forwarded-For is trusted for the client IP: the Caddy proxy's address or
+    # network (IPs or CIDRs, comma-separated). Empty: trust none and use the socket peer.
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator("site_origin")
     @classmethod
@@ -70,6 +79,23 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_cors_origins(cls, value: list[str]) -> list[str]:
         return [_parse_origin(item) for item in value]
+
+    @field_validator("trusted_proxies", mode="before")
+    @classmethod
+    def _split_trusted_proxies(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _validate_trusted_proxies(cls, value: list[str]) -> list[str]:
+        # Each entry must be an address or network; "*" (trust everyone) would let any client
+        # pick its own IP and walk around the login throttle.
+        try:
+            return [str(ipaddress.ip_network(item, strict=False)) for item in value]
+        except ValueError:
+            raise ValueError("each entry must be an IP address or CIDR network") from None
 
     @field_validator("log_level", mode="before")
     @classmethod

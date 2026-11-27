@@ -31,10 +31,12 @@ class AppError(Exception):
         *,
         code: str | None = None,
         details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.message = message or self.message
         self.code = code or self.code
         self.details = details or {}
+        self.headers = headers
         super().__init__(self.message)
 
 
@@ -70,6 +72,14 @@ class UnprocessableError(AppError):
     status_code = HTTPStatus.UNPROCESSABLE_ENTITY
     code = "unprocessable"
     message = "The request breaks a domain rule."
+
+
+class TooManyRequestsError(AppError):
+    """Pass ``headers={"Retry-After": "<seconds>"}`` so clients know when to try again."""
+
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+    code = "too_many_requests"
+    message = "Too many requests. Try again later."
 
 
 class ServiceUnavailableError(AppError):
@@ -108,7 +118,7 @@ def _code_for_status(status_code: int) -> str:
 async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, AppError):
         return await _unhandled_error_handler(request, exc)
-    return error_response(exc.status_code, exc.code, exc.message, exc.details)
+    return error_response(exc.status_code, exc.code, exc.message, exc.details, headers=exc.headers)
 
 
 async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
