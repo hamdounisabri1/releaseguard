@@ -52,7 +52,8 @@ export function ApplicationDetails() {
   const query = useQuery(applicationQueryOptions(applicationId));
 
   if (query.isPending) return <LoadingState label="Loading application…" />;
-  if (query.isError) {
+  // A failed background refetch keeps the loaded page on screen (frontend.md).
+  if (query.data === undefined) {
     return <ApiErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
 
@@ -112,7 +113,7 @@ export function ApplicationDetails() {
           <EnvironmentsTab
             applicationId={app.id}
             renderAction={
-              canConfigure
+              canConfigure && app.status === "active"
                 ? (env) => (
                     <Button asChild variant="outline" size="sm">
                       <Link

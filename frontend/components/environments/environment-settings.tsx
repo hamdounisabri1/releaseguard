@@ -1,13 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { Archive, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { environmentLabel, HealthBadge } from "@/components/environments/environment-labels";
 import { EnvironmentSettingsForm } from "@/components/environments/environment-settings-form";
 import { ApiErrorState } from "@/components/states/api-error-state";
+import { EmptyState } from "@/components/states/empty-state";
 import { LoadingState } from "@/components/states/loading-state";
 import { PermissionDenied } from "@/components/states/permission-denied";
 import { Button } from "@/components/ui/button";
@@ -51,12 +52,26 @@ export function EnvironmentSettings() {
     );
   }
   if (environment.isPending) return <LoadingState label="Loading environment…" />;
-  if (environment.isError) {
+  // A failed background refetch keeps the form (and unsaved input) on screen (frontend.md).
+  if (environment.data === undefined) {
     return <ApiErrorState error={environment.error} onRetry={() => void environment.refetch()} />;
   }
   const env = environment.data;
   // The URL names both ids; an environment of another application is "not found" here.
   if (env.application_id !== applicationId) return <ApiErrorState error={NOT_FOUND} />;
+  // The backend refuses changes to an archived application's environments (409).
+  if (application.data?.status === "archived") {
+    return (
+      <>
+        {back}
+        <EmptyState
+          icon={Archive}
+          title="This application is archived"
+          description="Its environments keep their settings and history, but they can't be changed."
+        />
+      </>
+    );
+  }
 
   return (
     <>

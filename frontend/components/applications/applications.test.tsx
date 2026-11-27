@@ -124,7 +124,20 @@ describe("ApplicationsList", () => {
   it("shows the empty state when there are no applications", async () => {
     stubApi({ "GET /api/v1/auth/me": meReply("admin"), "GET /api/v1/applications": page([]) });
     renderWithClient(<ApplicationsList />);
-    expect(await screen.findByText("No applications yet")).toBeTruthy();
+    expect(await screen.findByText("No active applications")).toBeTruthy();
+    expect(screen.getByText(/Archived ones show with Show archived/)).toBeTruthy();
+  });
+
+  it("says when the list shows only the first page", async () => {
+    stubApi({
+      "GET /api/v1/auth/me": meReply("viewer"),
+      "GET /api/v1/applications": {
+        status: 200,
+        body: { items: APPS, page: 1, page_size: 100, total: 120 },
+      },
+    });
+    renderWithClient(<ApplicationsList />);
+    expect(await screen.findByText(/Showing the first 2 of 120 applications/)).toBeTruthy();
   });
 
   it("shows the loading state, then the error state with a retry on a 5xx", async () => {
@@ -211,10 +224,16 @@ describe("ApplicationsList", () => {
     await user.click(await screen.findByRole("button", { name: "New application" }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Repository owner"), "-bad");
+    await user.type(within(dialog).getByLabelText("Repository name"), "..");
+    const branch = within(dialog).getByLabelText("Default branch");
+    await user.clear(branch);
+    await user.type(branch, "release..1");
     await user.click(within(dialog).getByRole("button", { name: "Create application" }));
 
     expect(await within(dialog).findByText("Enter a name.")).toBeTruthy();
     expect(within(dialog).getByText("Enter a GitHub user or organization name.")).toBeTruthy();
+    expect(within(dialog).getByText("Enter a GitHub repository name.")).toBeTruthy();
+    expect(within(dialog).getByText("Enter a valid branch name.")).toBeTruthy();
     expect(requestsTo(fetchMock, "POST /api/v1/applications")).toHaveLength(0);
   });
 

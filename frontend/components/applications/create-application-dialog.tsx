@@ -35,14 +35,16 @@ const createSchema = z.object({
   repository_name: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9._-]{1,100}$/, "Enter a GitHub repository name."),
+    .regex(/^[A-Za-z0-9._-]{1,100}$/, "Enter a GitHub repository name.")
+    .refine((name) => name !== "." && name !== "..", "Enter a GitHub repository name."),
   description: z.string().trim().max(500, "Use at most 500 characters."),
   default_branch: z
     .string()
     .trim()
     .min(1, "Enter the default branch.")
     .max(255, "Use at most 255 characters.")
-    .regex(/^[^\s~^:?*[\\-][^\s~^:?*[\\]*$/, "Enter a valid branch name."),
+    .regex(/^[^\s~^:?*[\\-][^\s~^:?*[\\]*$/, "Enter a valid branch name.")
+    .refine((branch) => !branch.includes(".."), "Enter a valid branch name."),
   ci_workflow_path: z
     .string()
     .trim()

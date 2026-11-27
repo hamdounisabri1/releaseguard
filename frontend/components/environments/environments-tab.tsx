@@ -87,7 +87,8 @@ type EnvironmentsTabProps = {
 export function EnvironmentsTab({ applicationId, renderAction }: EnvironmentsTabProps) {
   const query = useQuery(applicationEnvironmentsQueryOptions(applicationId));
   if (query.isPending) return <LoadingState label="Loading environments…" />;
-  if (query.isError) {
+  // A failed background refetch keeps the loaded data on screen (frontend.md).
+  if (query.data === undefined) {
     return <ApiErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
   if (query.data.length === 0) {
@@ -101,7 +102,7 @@ export function EnvironmentsTab({ applicationId, renderAction }: EnvironmentsTab
   }
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      {query.data.toSorted(byPromotionOrder).map((env) => (
+      {[...query.data].sort(byPromotionOrder).map((env) => (
         <EnvironmentCard key={env.id} environment={env} action={renderAction?.(env)} />
       ))}
     </div>
