@@ -1081,7 +1081,7 @@ uv run uvicorn app.main:app --reload --no-proxy-headers   # http://localhost:800
 uv run python -m app.worker                 # worker (second terminal)
 cd ../frontend && pnpm install && pnpm dev   # http://localhost:3000
 # or everything at once:
-docker compose -f infra/docker-compose.yml up --build
+docker compose -f infra/docker-compose.yml up -d --wait   # db + backend (migrates + seeds) + frontend, hot reload
 ```
 
 **Seed data:** one workspace, four users (one per role), the TaskFlow application with three environments, and some example releases and deployments, so every screen has content.
@@ -1092,6 +1092,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 | Variable | Used by | Notes |
 |---|---|---|
+| `POSTGRES_USER`, `POSTGRES_PASSWORD` | local compose `db` | `POSTGRES_PASSWORD` is required by `infra/docker-compose.yml`; its backend container builds its own `DATABASE_URL` for host `db` and passes the password as `PGPASSWORD`. Optional host ports: `DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` (shell or `infra/.env`) |
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…`. Required. Tests use `TEST_DATABASE_URL` (a separate database, rebuilt from the migrations each run) |
 | `SEED_PASSWORD` | seed script | Password of the seeded local users (default `releaseguard-dev`). The seed refuses `ENV=production` |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |

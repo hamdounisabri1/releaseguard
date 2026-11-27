@@ -5,9 +5,20 @@ Docker Compose, the reverse proxy and operations scripts for running ReleaseGuar
 | Path | Contents | Ticket |
 |---|---|---|
 | [`github/`](github/) | Repo settings as code: `protect-main` ruleset, rebase-merge only, labels | SCRUM-7 (Sprint 0) |
-| `docker-compose.yml` | Local development stack: db, backend, worker, frontend | SCRUM-32 (Sprint 1) |
+| [`docker-compose.yml`](docker-compose.yml) | Local development stack: db (Postgres 17), backend, frontend; the worker joins when it exists | SCRUM-32 (Sprint 1) |
+| [`postgres/init/`](postgres/init/) | First-start SQL for the local db: creates `releaseguard_test` | SCRUM-32 (Sprint 1) |
 | [`reverse-proxy/`](reverse-proxy/README.md) | Caddy: one origin, `/` → frontend, `/api` → backend, automatic TLS | SCRUM-94 (Sprint 6) |
 | [`scripts/`](scripts/README.md) | Backup, restore and deploy scripts | SCRUM-97 (Sprint 6) |
+
+## Local development stack
+
+`docker compose -f infra/docker-compose.yml up -d db` starts Postgres only (run the apps on the host); `up -d --wait` starts db, backend and frontend with hot reload. Settings come from the repo-root `.env` (`env_file`); it must set `POSTGRES_PASSWORD` (see `.env.example`).
+
+- **No secrets in the file.** The backend container builds `DATABASE_URL` at start for host `db` without a password and passes `POSTGRES_PASSWORD` as libpq's `PGPASSWORD`, because Compose's own `${...}` interpolation reads `infra/.env` or the shell, never the repo-root `.env`.
+- **Localhost only.** Every published port binds to `127.0.0.1` (`DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` change the host side; set them in the shell or `infra/.env`).
+- **Volumes:** `db-data` (Postgres), `backend-venv` and `uv-cache` (Linux venv, kept apart from a host `.venv`), `frontend-node-modules`, `frontend-next` and `pnpm-store` (kept out of the bind-mounted `frontend/`). `down -v` resets them all, including the database.
+- The backend runs `alembic upgrade head` and the idempotent seed on every start. `DATABASE_URL` exists only in its start command's shell, so restart the service (`docker compose -f infra/docker-compose.yml restart backend`) rather than running those through `exec`.
+- The production stack (Caddy, built images pinned by digest, worker) is SCRUM-93/94.
 
 ## GitHub repository settings
 
