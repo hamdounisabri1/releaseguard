@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { safeNextPath } from "@/lib/auth-routes";
+import { fieldErrors } from "@/lib/form-errors";
 import { loginRedirectBounced, markLoginRedirect } from "@/lib/login-redirect";
 import { ApiError } from "@/services/api";
 import { login, meQueryKey, meQueryOptions } from "@/services/auth";
@@ -30,7 +31,7 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-const FIELDS: ReadonlySet<string> = new Set<Path<LoginValues>>(["email", "password"]);
+const FIELDS: ReadonlySet<Path<LoginValues>> = new Set<Path<LoginValues>>(["email", "password"]);
 
 /** The message above the button for a failed sign-in; `null` when the error belongs to a field. */
 export function loginErrorMessage(error: unknown, hasFieldErrors = false): string | null {
@@ -44,20 +45,6 @@ export function loginErrorMessage(error: unknown, hasFieldErrors = false): strin
   if (error.status === 403)
     return "Sign-in was refused for this site. Reload the page and try again.";
   return "Sign-in isn't available right now. Try again in a moment.";
-}
-
-/** 422 `validation_error` details → `[field, message]` pairs for the fields on this form. */
-function fieldErrors(error: unknown): Array<[Path<LoginValues>, string]> {
-  if (!(error instanceof ApiError) || error.status !== 422) return [];
-  const errors = error.details.errors;
-  if (!Array.isArray(errors)) return [];
-  return errors.flatMap((item: unknown) => {
-    if (typeof item !== "object" || item === null) return [];
-    const { loc, msg } = item as { loc?: unknown; msg?: unknown };
-    const field = Array.isArray(loc) ? loc.at(-1) : undefined;
-    if (typeof field !== "string" || !FIELDS.has(field) || typeof msg !== "string") return [];
-    return [[field as Path<LoginValues>, msg]];
-  });
 }
 
 /** Email + password sign-in; on success goes to `?next=` (same-site paths only) or the dashboard. */
@@ -95,7 +82,7 @@ export function LoginForm() {
     mutationFn: login,
     onSuccess: (user) => queryClient.setQueryData(meQueryKey, user),
     onError: (error) => {
-      const byField = fieldErrors(error);
+      const byField = fieldErrors(error, FIELDS);
       for (const [field, message] of byField) form.setError(field, { message });
       setFormError(loginErrorMessage(error, byField.length > 0));
       form.resetField("password");

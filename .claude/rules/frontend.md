@@ -50,6 +50,14 @@ paths:
 - Sign-out calls `logout()`, then does a full page load to `/login`, so no cached query of the old session survives. Only success or a 401 counts as signed out; any other failure keeps the user on the page with an alert (the session is still alive).
 - The frontend and API must share a host in dev (`localhost:3000` and `localhost:8000`, not `127.0.0.1` for one of them): the host-only session cookie has to reach `proxy.ts`. If it doesn't, the login page's "already signed in" redirect would bounce off the proxy forever; `lib/login-redirect.ts` detects the bounce and shows a message instead.
 
+## Applications and environments (SCRUM-30)
+- `/applications` (`components/applications/`) lists the workspace's applications. **Search filters in the browser**: `GET /applications` has no search parameter, so the list loads the largest page (100) and `matchesSearch` filters name, description and `owner/name`. "Show archived" sets `include_archived`. `/applications/[applicationId]` shows one application with **Environments** and **Repository** tabs; `useParams()` sits behind `<Suspense>` in the page.
+- Role-gated controls use `can(role, capability)` from `lib/permissions.ts`, a copy of the backend matrix (`app/core/permissions.py`) for **hiding controls only**. Keep the two in sync; the backend still answers 403, which the UI shows (archive dialog alert, `PermissionDenied`).
+- Forms: `FormInput` / `FormAlert` (`components/forms/form-input.tsx`) for label, input, help and inline error; 422s go to fields through `fieldErrors(error, FIELDS)` (`lib/form-errors.ts`; nested `loc` → `policy.min_approvals`). A 409 that names a field (`repository_already_registered`) is set on that field too.
+- Confirmation dialogs that call the API use a plain `Button` for the action, not `AlertDialogAction` (it closes the dialog before the request ends, so a failure would vanish). Give icon-plus-text buttons that repeat per row an `aria-label` naming the row ("Archive TaskFlow").
+- Environment health uses `HealthBadge` (`components/environments/environment-labels.tsx`); environments are shown in promotion order (development, staging, production).
+- Component tests share `test-utils/api-stub.tsx` (`stubApi`, `requestsTo`, `meReply`, `errorReply`, `renderWithClient`). There's no jest-dom: assert with `getAttribute`/`textContent`. Wait for a row (`findByRole("link", …)`) before `getByRole` on a large table: `findByRole` can time out at 1 s in jsdom.
+
 ## Quality
 - `pnpm lint`, `pnpm typecheck` (runs `next typegen`, then `tsc --noEmit`, so `LayoutProps` exists on a fresh clone) and `pnpm build` must pass. `pnpm format:check` must be clean. No `any` in API-facing code.
 
