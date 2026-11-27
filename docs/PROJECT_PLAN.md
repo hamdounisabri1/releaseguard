@@ -342,12 +342,12 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
 - **Date:** Fri 27 Nov 2026
 - **Done yesterday (merged in PR #17):** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-33 CI workflow and required checks · SCRUM-34 route-wide security sweeps
-- **Done today:** SCRUM-110 login throttling · SCRUM-32 local docker-compose (one PR for both)
-- **Today's Tasks:** SCRUM-110 login throttling (1.5 h) · SCRUM-32 local docker-compose (30 min) · SCRUM-28 login page, auth guard, dashboard placeholder (1 h) · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Five Tasks, 5.5 h planned; SCRUM-30 and SCRUM-31 follow SCRUM-28 in the same session.
+- **Done today (morning):** SCRUM-110 login throttling · SCRUM-32 local docker-compose (one PR for both, [#19](https://github.com/hamdounisabri1/releaseguard/pull/19), merged; Jira Done)
+- **Today's Tasks:** SCRUM-110 and SCRUM-32 done · SCRUM-28 login page, auth guard, dashboard placeholder (1 h) · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Three Tasks left, 3.5 h planned; SCRUM-30 and SCRUM-31 follow SCRUM-28 in the same session.
 - **Carried over:** none
-- **Blocked:** none at the start of the day (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)
-- **Next:** SCRUM-28 → SCRUM-30 → SCRUM-31 on their own branch and PR, after the SCRUM-110/32 PR; the sprint closes when SCRUM-31 is Done
-- **Schedule:** on plan. 5.5 h of Tasks inside Fri 27 Nov's 09:00–18:30 blocks plus the buffer. Sprint 1 closes today at 18:30 (`v0.1.0`).
+- **Blocked:** none (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)
+- **Next:** SCRUM-28 → SCRUM-30 → SCRUM-31 on their own branch and PR each, branched from `main` (SCRUM-28 is the afternoon's first Task); the sprint closes when SCRUM-31 is Done
+- **Schedule:** morning block done on plan. Afternoon: 3.5 h of Tasks inside the 14:00–18:30 blocks plus the buffer. Sprint 1 closes today at 18:30 (`v0.1.0`).
 
 ### Labels
 | Group | Labels |
