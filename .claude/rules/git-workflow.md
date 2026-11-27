@@ -23,6 +23,7 @@
 - **Leave no edit behind on `main`.** Every file change goes through a branch and a PR, including process edits: the Task's own plan checkbox (ticked in its PR, before merge), the daily "Today" block (rides on the day's first Task branch), and sprint-close edits (retro, "Current sprint" line, leftover ticks) in a `docs/sprint-<N>-close` PR. Anything that would only happen after a merge must be done before it, inside the PR.
 - **The user merges every PR, by hand, in GitHub. Claude never merges** (`gh pr merge` and the MCP merge tool are denied in `.claude/settings.json`). Claude says when a PR is ready to merge; once `gh pr view <n> --json state` shows `MERGED`, it marks the Task Done, deletes the local branch with `git branch -D` (rebase-merge gives the commits new SHAs, so `-d` refuses) and pulls `main`.
 - After merging, delete the branch and pull `main`.
+- **A merged branch is finished: never push it or open a PR from it again.** GitHub deletes the head branch on merge (`delete_branch_on_merge`, set by `infra/github/setup-repo.sh`), but a stale local copy still holds the pre-rebase SHAs. Pushing it restores the branch, and a new PR then shows already-merged work as new, with conflicts. Before any push or `gh pr create`, check `gh pr list --head <branch> --state merged`; follow-up work goes on a **new** branch from `main`. The `pre_bash.py` hook blocks both commands for a branch with a merged PR.
 - Claude commits after each green step and, when the Task is complete, pushes and opens the PR on its own (see above). For an unfinished branch at session end, it reminds the user and pushes once they say so.
 - **Commit on demand:** the user can ask for a commit (or a push) at any time, not only at these points. Claude does it right away: it reviews `git diff --staged` for secrets, writes a Conventional Commit message with the Jira key, and commits on the current Task branch. If the current branch is `main`, it creates the Task branch first, because nothing is committed directly to `main`.
 
@@ -48,3 +49,6 @@ Issues are Jira tickets in project `SCRUM` (see `jira-workflow.md`). A ticket is
 ## Decisions and scope
 - Record significant technical decisions as ADRs: `docs/adr/NNNN-title.md` (context, decision, consequences).
 - Don't add out-of-scope v1 features (Kubernetes, other CI providers, canary or blue-green, automatic rollback, a policy language). If the schedule slips, apply the **cut list** in `docs/PROJECT_PLAN.md` §6 in order. Never cut the items on its "never cut" list.
+
+## Lessons learned
+- **Delete a Task's local branch the moment its PR shows `MERGED`, and never push a branch that already has a merged PR.** Why: a stale `feat/SCRUM-28-login-page` was pushed after its rebase-merge, which restored it on GitHub and opened duplicate PR #21 with conflicts. (2026-11-27, PR #21)

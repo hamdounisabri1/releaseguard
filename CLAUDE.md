@@ -106,7 +106,7 @@ Detailed rules live in their own files so this file stays short. Files with a `p
 
 | What | Does |
 |---|---|
-| Hook `hooks/pre_bash.py` (PreToolUse, Bash/PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key`; runs gitleaks on `git commit` if a `gitleaks` binary is on `PATH` (pre-commit's own gitleaks hook runs on every commit regardless) |
+| Hook `hooks/pre_bash.py` (PreToolUse, Bash/PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key`; runs gitleaks on `git commit` if a `gitleaks` binary is on `PATH` (pre-commit's own gitleaks hook runs on every commit regardless); blocks `git push` / `gh pr create` for a branch that already has a merged PR (tests: `hooks/test_pre_bash.py`) |
 | Hook `hooks/post_edit.py` (PostToolUse, Edit/Write) | Runs `ruff format` + `ruff check --fix` on backend Python and `eslint --fix` on frontend TS/JS once that tooling exists; reports leftover errors |
 | `settings.json` permissions | Denies reading secret files and deleting repos or files via the GitHub MCP; denies merging PRs (`gh pr merge`, MCP merge: the user merges by hand); asks before `git push` or pushing files via MCP |
 | Agent `release-safety-reviewer` | Checks a diff against the state-machine, approval, webhook, tenancy and dispatch invariants |
