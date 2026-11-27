@@ -18,7 +18,7 @@ export function stubApi(routes: Routes) {
     const key = `${input.method} ${new URL(input.url).pathname}`;
     const route = routes[key];
     if (!route) throw new Error(`unexpected request ${key}`);
-    const { status, body } = typeof route === "function" ? await route(input) : route;
+    const { status, body } = typeof route === "function" ? await route(input.clone()) : route;
     return new Response(body === undefined ? null : JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json" },

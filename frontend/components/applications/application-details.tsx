@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { ApplicationStatusBadge } from "@/components/applications/application-status-badge";
 import { ArchiveApplicationButton } from "@/components/applications/archive-application-button";
+import { environmentLabel } from "@/components/environments/environment-labels";
 import { EnvironmentsTab } from "@/components/environments/environments-tab";
 import { ApiErrorState } from "@/components/states/api-error-state";
 import { LoadingState } from "@/components/states/loading-state";
@@ -47,6 +48,7 @@ export function ApplicationDetails() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const { data: me } = useQuery(meQueryOptions);
   const canManage = can(me?.role, "manage_applications");
+  const canConfigure = can(me?.role, "configure_environments");
   const query = useQuery(applicationQueryOptions(applicationId));
 
   if (query.isPending) return <LoadingState label="Loading application…" />;
@@ -107,7 +109,24 @@ export function ApplicationDetails() {
           <TabsTrigger value="repository">Repository</TabsTrigger>
         </TabsList>
         <TabsContent value="environments" className="pt-2">
-          <EnvironmentsTab applicationId={app.id} />
+          <EnvironmentsTab
+            applicationId={app.id}
+            renderAction={
+              canConfigure
+                ? (env) => (
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={`/applications/${app.id}/environments/${env.id}`}
+                        aria-label={`Configure ${environmentLabel(env.environment_type)}`}
+                      >
+                        <Settings2 aria-hidden="true" />
+                        Configure
+                      </Link>
+                    </Button>
+                  )
+                : undefined
+            }
+          />
         </TabsContent>
         <TabsContent value="repository" className="pt-2">
           <RepositorySettings application={app} />

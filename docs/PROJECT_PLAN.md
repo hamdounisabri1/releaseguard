@@ -156,7 +156,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [x] SCRUM-27 *(1 h)* API client in `services/`, types generated from OpenAPI (`openapi-typescript`), TanStack Query
 - [x] SCRUM-28 *(1 h)* Login page; auth guard; dashboard placeholder
 - [x] SCRUM-30 *(1.5 h)* Applications list (search, create, archive) and application details with environments tab
-- [ ] SCRUM-31 *(1 h)* Environment settings form (health URL, expected status, interval, timeout, threshold, verification rule)
+- [x] SCRUM-31 *(1 h)* Environment settings form (health URL, expected status, interval, timeout, threshold, verification rule)
 - [x] SCRUM-29 *(30 min)* Shared empty, loading, error and permission-denied components
 
 **DevOps**
@@ -343,11 +343,11 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 - **Date:** Fri 27 Nov 2026
 - **Done yesterday (merged in PR #17):** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-33 CI workflow and required checks · SCRUM-34 route-wide security sweeps
 - **Done today (morning):** SCRUM-110 login throttling · SCRUM-32 local docker-compose (one PR for both, [#19](https://github.com/hamdounisabri1/releaseguard/pull/19), merged; Jira Done)
-- **Done today (afternoon):** SCRUM-28 login page, auth guard (`proxy.ts` + `AuthGuard`), sign-out and dashboard placeholder (merged) · SCRUM-30 applications list (search, create, archive) and details with environments tab (bulk PR with SCRUM-31)
+- **Done today (afternoon):** SCRUM-28 login page, auth guard (`proxy.ts` + `AuthGuard`), sign-out and dashboard placeholder (merged) · SCRUM-30 applications list (search, create, archive) and details with environments tab · SCRUM-31 environment settings form (one bulk PR for both)
 - **Today's Tasks:** SCRUM-110, SCRUM-32 and SCRUM-28 done · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Two Tasks left, 2.5 h planned.
 - **Carried over:** none
 - **Blocked:** none (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)
-- **Next:** SCRUM-30 → SCRUM-31 on their own branch and PR each, branched from `main` once SCRUM-28 is merged; the sprint closes when SCRUM-31 is Done
+- **Next:** merge the SCRUM-30/31 bulk PR; the sprint closes when both are Done → `v0.1.0`
 - **Schedule:** morning block done on plan. Afternoon: 3.5 h of Tasks inside the 14:00–18:30 blocks plus the buffer. Sprint 1 closes today at 18:30 (`v0.1.0`).
 
 ### Labels
