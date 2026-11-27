@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -20,6 +21,23 @@ def test_missing_site_origin_fails_fast(monkeypatch: pytest.MonkeyPatch, no_env_
     monkeypatch.delenv("SITE_ORIGIN", raising=False)
     with pytest.raises(ValidationError, match="site_origin"):
         Settings()
+
+
+def test_validation_error_never_echoes_env_file_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Short and alone in the input: pydantic truncates a long input_value in the message, which
+    # would hide the leak this test guards against.
+    secret = "whsec-1234"  # noqa: S105 (test value)
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"GITHUB_WEBHOOK_SECRET={secret}\n")
+    monkeypatch.setitem(Settings.model_config, "env_file", env_file)
+    for name in ("SITE_ORIGIN", "DATABASE_URL", "ENV", "CORS_ORIGINS", "LOG_LEVEL"):
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(ValidationError) as excinfo:
+        Settings()
+    assert "site_origin" in str(excinfo.value)
+    assert secret not in str(excinfo.value)
 
 
 def test_app_refuses_to_start_without_site_origin(

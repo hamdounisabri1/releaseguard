@@ -39,6 +39,9 @@ class Settings(BaseSettings):
         # The shared .env also holds worker and GitHub App variables this model doesn't use yet.
         extra="ignore",
         frozen=True,
+        # A validation error otherwise echoes the whole input, which includes every .env value
+        # (webhook secret, database password) into the startup traceback.
+        hide_input_in_errors=True,
     )
 
     # Fails closed: an unset ENV means production rules (https SITE_ORIGIN, no CORS_ORIGINS).
