@@ -71,7 +71,7 @@ Built-in skills the rules also reference (shipped with Claude Code, nothing to i
 
 | Item | Type | What it does |
 |---|---|---|
-| `.claude/hooks/pre_bash.py` | PreToolUse hook (Bash, PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key` (`.env.example` is allowed). On `git commit` runs `gitleaks` on staged changes **if a `gitleaks` binary is on `PATH`** and blocks on findings. The main secret gate is the pre-commit gitleaks hook, which needs no separate install |
+| `.claude/hooks/pre_bash.py` | PreToolUse hook (Bash, PowerShell) | Blocks commands that read `.env`, `*.pem` or `*.key` (`.env.example` is allowed). On `git commit` runs `gitleaks` on staged changes **if a `gitleaks` binary is on `PATH`** and blocks on findings. The main secret gate is the pre-commit gitleaks hook, which needs no separate install. On `git push` and `gh pr create`, blocks a branch that already has a merged PR (stale branches re-pushed after a rebase-merge make duplicate PRs with conflicts); fails open without `gh`. Tests: `test_pre_bash.py` |
 | `.claude/hooks/post_edit.py` | PostToolUse hook (Edit, Write, MultiEdit) | Backend `*.py`: `uv run ruff format` + `ruff check --fix`. Frontend TS/JS: `eslint --fix` (eslint's JS entry run with `node`, so route-group paths like `app/(app)/…` work on Windows). Silent until `backend/pyproject.toml` or `frontend/node_modules` exists. Regression tests: `uv run --no-project --with pytest pytest .claude/hooks` |
 | `release-safety-reviewer` | Subagent | Read-only review of a diff against the state-machine, approval, concurrency, tenancy, webhook, dispatch and secrets invariants |
 | `/sprint-status` | Command | Current sprint summary from the plan and Jira |
