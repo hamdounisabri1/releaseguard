@@ -114,10 +114,10 @@ Every day runs 09:00–13:00 and 14:00–20:00. Each sprint ends with a 15-minut
 | Fri 27 Nov | S1 Foundation | 09:00–12:30 SCRUM-27, 28, 30 · 14:00–15:30 SCRUM-31, 29 · 15:30–18:30 SCRUM-32, 33, 34 · 18:30 close → `v0.1.0` | 8 h + 15 min | 1.75 h |
 | Sat 28 Nov | S2 Releases | 09:00–13:00 SCRUM-35, 40, 38, 39, 36, 41, 52, 43 · 14:00–17:15 SCRUM-44, 45, 37, 42, 46 · 17:15–19:45 SCRUM-47, 48, 49, 50, 51, 53 · 19:45 close → `v0.2.0` | 9.75 h + 15 min | 0 |
 | Sun 29 Nov | S3 Approvals | 09:00–13:00 SCRUM-54, 55, 56, 57 · 14:00–16:30 SCRUM-58, 59, 64, 65, 66 · 16:30–19:30 SCRUM-60, 61, 62, 63 · 19:30 close → `v0.3.0` | 9.5 h + 15 min | 15 min |
-| Mon 30 Nov | S4 Health & rollback | 09:00–13:00 SCRUM-67, 68, 69, 70, 72, 73 · 14:00–16:45 SCRUM-71, 77 · 16:45–18:45 SCRUM-74, 75, 76 · 18:45 close → `v0.4.0` | 8.75 h + 15 min | 1 h |
+| Mon 30 Nov | S4 Health & rollback | 09:00–13:00 SCRUM-67, 68, 69, 70, 72, 73 · 14:00–16:45 SCRUM-71, 77 · 16:45–18:45 SCRUM-74, 75, 76 · 18:45–19:15 SCRUM-112 · 19:15 close → `v0.4.0` | 9.25 h + 15 min | 30 min |
 | Tue 1 Dec | S5 AI | 09:00–13:00 SCRUM-78, 79, 80, 81, 82, 83, 87 · 14:00–16:45 SCRUM-84, 86, 91, 92 · 16:45–19:00 SCRUM-88, 89, 90, 85 (stretch, last) · 19:00 close → `v0.5.0` | 9 h + 15 min | 45 min |
 | Wed 2 Dec | S6 Delivery | 09:00–13:00 SCRUM-93, 94, 96, 95, 97, 105 · 14:00–17:00 SCRUM-99, 100, 101, 102, 103 · 17:00–19:45 SCRUM-104, 106, 107, 109, 108 · 19:45 close → **`v1.0.0`** | 9.75 h + 15 min | 0 |
-| **Total** | | SCRUM-98 (Prometheus/Grafana, 30 min) is done only if buffer is left (cut list #2) | **64.75 h of 70 h** | **≈ 5.25 h** |
+| **Total** | | SCRUM-98 (Prometheus/Grafana, 30 min) is done only if buffer is left (cut list #2) | **65.25 h of 70 h** | **≈ 4.75 h** |
 
 > **Design revision (23 Nov 2026):** the checklists below follow the reviewed architecture ([ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md), ADRs 0001–0007). The main changes: the worker and jobs table move to **S2** (staging dispatch needs them), TaskFlow has **one `deploy.yml`** (S4 needs no rollback workflow), approvals live on the deployment (no `approval_requests` or `rollback_events` tables), and releases register through **GitHub OIDC**.
 
@@ -237,7 +237,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 ---
 
-### Sprint 4: Health and rollback (Mon 30 Nov 2026, 09:00–20:00 · 8.75 h planned of 10 h) → `v0.4.0` · Epic SCRUM-15
+### Sprint 4: Health and rollback (Mon 30 Nov 2026, 09:00–20:00 · 9.25 h planned of 10 h) → `v0.4.0` · Epic SCRUM-15
 **Goal:** a failed or unhealthy release can be replaced by an earlier known-good artifact.
 
 **Worker**
@@ -260,6 +260,9 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 **Tests**
 - [ ] SCRUM-77 *(1.25 h)* Threshold logic (a single transient failure doesn't flip state); verification timeout; SSRF-blocked URL; rollback to an ineligible target rejected; rollback workflow failure; concurrent rollback returns 409; retention keeps verification checks
+
+**Tooling** (added 28 Nov 2026; deferred tool, `maintenance.md` §4)
+- [ ] SCRUM-112 *(30 min)* Turn on **graphify**: build the code graph (`graphify update .`, code pass only, `graphify-out/` git-ignored) and check the cross-module invariants: only `deployment_service` sets `status`; the API process never calls GitHub, the LLM or health URLs. A violation becomes a `Bug:` Task
 
 **Definition of done:** deploy the bad release to production → it ends Unhealthy and the environment turns unhealthy → roll back to the earlier digest → health is restored. History shows both deployments.
 

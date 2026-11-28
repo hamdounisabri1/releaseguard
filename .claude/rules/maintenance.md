@@ -25,3 +25,16 @@ Use the "Keep the docs in sync" table in `CLAUDE.md` to find the file, and updat
 4. Mention a new lesson in the commit body (`Lesson: added to .claude/rules/<file>.md`).
 
 **Cap:** at most 8 lessons per rules file. At sprint end, promote recurring lessons into the rule body and delete the rest, so always-loaded context doesn't grow without bound.
+
+## 4. Deferred tools: installed now, used from a later sprint
+Some tools only pay off once the code is big enough. They are installed and documented up front (§1) but **not used before their sprint**, unless the user asks for them by name. Each one has an activation Task in that sprint of `docs/PROJECT_PLAN.md`.
+
+| Tool | From | Use it only for |
+|---|---|---|
+| `graphify` (skill + `graphifyy` CLI, pinned in `AI_TOOLING.md`) | **Sprint 4** (SCRUM-112), when the worker, GitHub dispatch, health checks and rollback all meet | A question that crosses 3 or more modules or processes (API ↔ worker ↔ GitHub ↔ frontend); checking the "only X does Y" invariants (only `deployment_service` sets `status`; the API process never calls GitHub, the LLM or health URLs); the impact of a change to a shared module (`graphify path`, `graphify explain`, `graphify query`) |
+
+graphify rules:
+- **Code pass only:** `graphify update .` (tree-sitter AST, local, no LLM, no tokens). Never run the semantic pass over docs, PDFs or images, and never with `GEMINI_API_KEY`/`GOOGLE_API_KEY` set (it would send project text to an outside provider).
+- **No always-on wiring.** Never run `graphify install`, `graphify claude install` or `graphify hook install`. On Windows, `graphify install --project` also adds `PreToolUse` and `SessionStart` hooks to `.claude/settings.json` and a "query the graph first" section to the root `CLAUDE.md`. Revert both if they appear; to update the skill, follow `AI_TOOLING.md` § Local changes.
+- **Rebuild before you trust it** (`graphify update .`). `graphify-out/` is git-ignored and never committed. A graph answer marked `INFERRED` is a lead, not a fact: confirm it in the code before acting on it.
+- Grep and Read stay the default for anything inside one module.

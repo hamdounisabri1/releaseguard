@@ -47,6 +47,7 @@ cd backend && uv run python -m app.scripts.export_openapi ../openapi.json   # Op
 pnpm dlx shadcn@latest add <component>                        # new shadcn/ui primitive into components/ui/
 uv run --no-project --with pytest pytest .claude/hooks .claude/scripts .claude/skills/project-progress/scripts   # tests for the Claude Code hooks, jira.py and the progress collector
 py -3 .claude/skills/project-progress/scripts/collect.py      # facts for /project-progress as JSON (read-only; --no-network skips gh, --today YYYY-MM-DD)
+graphify update . && graphify path "<A>" "<B>"                # (Sprint 4+, maintenance.md §4) rebuild the code graph (local AST) and trace how two things connect; also `graphify explain`, `graphify query`
 
 # Jira (SCRUM): many tickets per call; JIRA_URL/JIRA_EMAIL/JIRA_API_TOKEN from the env; writes take --dry-run
 py -3 .claude/scripts/jira.py brief --open --short     # open Tasks in the active sprint: status, plan estimate, blockers
@@ -90,7 +91,7 @@ Detailed rules live in their own files so this file stays short. Files with a `p
 
 | File | Covers | Loads |
 |---|---|---|
-| [maintenance.md](.claude/rules/maintenance.md) | Committing new tools, keeping `.md` files current, regression tests and lessons | Always |
+| [maintenance.md](.claude/rules/maintenance.md) | Committing new tools, keeping `.md` files current, regression tests and lessons, deferred tools (graphify from Sprint 4) | Always |
 | [security.md](.claude/rules/security.md) | Auth, RBAC, secrets, webhooks, deployment safety | Always |
 | [git-workflow.md](.claude/rules/git-workflow.md) | Branches, commits, PRs, Definition of Done, ADRs | Always |
 | [jira-workflow.md](.claude/rules/jira-workflow.md) | Claude as project manager: up-front sprint planning, daily plan, tickets, auto-Done, bugs, sprint end | `docs/PROJECT_PLAN.md`, `docs/retros/**`, or read explicitly |
@@ -132,6 +133,7 @@ The project-scoped tooling is listed in [docs/AI_TOOLING.md](docs/AI_TOOLING.md)
 | Reading, starting, finishing or labelling Jira tickets | `py -3 .claude/scripts/jira.py` first (many keys per call); the `jira` MCP server (`mcp-atlassian`, tools `jira_*`) for creating issues, links and sprints, or if the script fails; the `jira-integration` skill is background reference only |
 | Starting or completing two or more Tasks together | `/bulk` |
 | Reporting overall project progress (status report, stakeholder update, "where are we") | `/project-progress` (`/sprint-status` is only the current sprint) |
+| **From Sprint 4 only:** tracing a flow across 3 or more modules or processes, checking an "only X does Y" invariant, or the impact of changing a shared module | `graphify` skill (deferred tool: code pass only, no hooks; rules in `maintenance.md` §4) |
 | Planning all sprints up front: turning the `PROJECT_PLAN.md` checklists into Jira Tasks | `/to-tickets` skill (Jira configuration in `jira-workflow.md` §3) |
 | Designing a new component, API, data model or service boundary, or weighing options for a technical decision | `system-design` and `architecture` skills (they inform; `DEVELOPMENT_LIFECYCLE.md` stays the source of truth). Record the decision with `/new-adr` |
 | Writing code against a library API (Next.js, FastAPI, SQLAlchemy, Alembic, Pydantic, TanStack Query, shadcn/ui, GitHub REST) | `context7` (look up current docs) |
