@@ -47,7 +47,9 @@ paths:
 
 ## Worker (ADR-0004)
 - Same codebase, its own entrypoint (`python -m app.worker`). One async loop: claim due rows from `jobs` with `SELECT … FOR UPDATE SKIP LOCKED`, set `locked_until`, run the handler for its `kind`, then mark `done` or reschedule with exponential backoff; `dead` after `max_attempts`. No APScheduler.
-- Jobs are idempotent (`dedupe_key`), carry `workspace_id`, and log start, finish, retry and failure. Payloads are Pydantic models shared with the API.
+- Jobs are idempotent (`dedupe_key`), carry `workspace_id`, and log start, finish, retry and failure. Payloads are Pydantic models shared with the API (`app/schemas/jobs.py`). Enqueue with `app.services.jobs.enqueue` inside the state change's transaction (it never commits).
+- **Code:** `app/worker/runner.py` (`Worker`, `JobSpec(handler, on_dead)`, `Sweep`), handlers registered in `app/worker/registry.py`, claim queries in `app/repositories/job_queue.py` (the one unscoped tenant repository besides `identity`). A worker claims **only registered kinds**, so a kind without a handler waits in `pending`. A crashed attempt is re-run once its lease (`locked_until`) passes; on the last attempt it goes `dead` (`LeaseExpired`). Writes after the claim are conditional on the attempt number, so a stale attempt can't overwrite a newer one.
+- `last_error` and log lines keep the exception **class only** (`error_name`), never its message: it can carry a token or a URL with credentials.
 - Sweeps in the same loop: `expire_approvals` (60 s), `reconcile_runs` (60 s; `run_not_found` after `DISPATCH_TIMEOUT_SECONDS`), `health_checks_due` (5 s, by `environments.next_check_at`), `retention` (daily).
 - Never hold a DB transaction open across an HTTP call: read → commit → call → new transaction to write the result.
 - Health: verification needs `verify_successes` consecutive passes within `verify_timeout_seconds`; `failure_threshold` consecutive failures or the timeout → `unhealthy`. Scheduled checks change only `environments.health_status`, and only after `failure_threshold` **consecutive** failures. Every health URL goes through the SSRF guard (`security.md`).

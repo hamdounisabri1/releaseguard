@@ -5,7 +5,7 @@ Docker Compose, the reverse proxy and operations scripts for running ReleaseGuar
 | Path | Contents | Ticket |
 |---|---|---|
 | [`github/`](github/) | Repo settings as code: `protect-main` ruleset, rebase-merge only, labels | SCRUM-7 (Sprint 0) |
-| [`docker-compose.yml`](docker-compose.yml) | Local development stack: db (Postgres 17), backend, frontend; the worker joins when it exists | SCRUM-32 (Sprint 1) |
+| [`docker-compose.yml`](docker-compose.yml) | Local development stack: db (Postgres 17), backend, worker, frontend | SCRUM-32 (Sprint 1), worker SCRUM-41 |
 | [`postgres/init/`](postgres/init/) | First-start SQL for the local db: creates `releaseguard_test` | SCRUM-32 (Sprint 1) |
 | [`reverse-proxy/`](reverse-proxy/README.md) | Caddy: one origin, `/` → frontend, `/api` → backend, automatic TLS | SCRUM-94 (Sprint 6) |
 | [`scripts/`](scripts/README.md) | Backup, restore and deploy scripts | SCRUM-97 (Sprint 6) |

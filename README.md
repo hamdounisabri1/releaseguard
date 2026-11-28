@@ -57,7 +57,7 @@ CLAUDE.md       Instructions for Claude Code
 .mcp.json       Project MCP servers (Jira)
 ```
 
-`backend/` (skeleton, SCRUM-18) and `frontend/` (app shell, SCRUM-26) hold code; `worker/` and `infra/` hold README placeholders that describe their planned layout ([guide §5.6](docs/DEVELOPMENT_LIFECYCLE.md#56-repository-layout)). The sample app **TaskFlow** lives in a separate repository: [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow).
+`backend/` (API and the worker's code) and `frontend/` (app shell, SCRUM-26) hold code, `infra/` the local compose stack; `worker/` holds a README placeholder that describe their planned layout ([guide §5.6](docs/DEVELOPMENT_LIFECYCLE.md#56-repository-layout)). The sample app **TaskFlow** lives in a separate repository: [hamdounisabri1/taskflow](https://github.com/hamdounisabri1/taskflow).
 
 ## Getting started
 

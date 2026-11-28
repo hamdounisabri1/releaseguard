@@ -1101,6 +1101,7 @@ docker compose -f infra/docker-compose.yml up -d --wait   # db + backend (migrat
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
 | `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
+| `WORKER_POLL_INTERVAL_SECONDS`, `WORKER_JOB_LEASE_SECONDS`, `WORKER_BACKOFF_BASE_SECONDS`, `WORKER_BACKOFF_MAX_SECONDS` | worker | Idle poll (1 s), job lease before another worker may re-run a crashed job (300 s), retry backoff base · 2^(attempt−1) capped (5 s, 600 s) |
 | `DISPATCH_TIMEOUT_SECONDS` | worker | How long a deployment may wait for its GitHub run before `run_not_found` (default 600) |
 | `HEALTH_CHECK_ALLOW_PRIVATE` | worker | `true` only in local dev, to allow health URLs on private addresses (default `false`) |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | worker | AI can be disabled by leaving the key empty |

@@ -181,7 +181,7 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 
 **Backend and worker**
 - [x] SCRUM-36 *(30 min)* Migration: `releases`, `deployments` (incl. the **partial unique index** on active statuses), `deployment_events` (append-only), `integrations`, `webhook_deliveries`, `jobs`
-- [ ] SCRUM-41 *(45 min)* Worker: entrypoint and container, job runner (`FOR UPDATE SKIP LOCKED`, backoff, `dead` after `max_attempts`), sweep loop ([ADR-0004](adr/0004-postgres-jobs-table.md))
+- [x] SCRUM-41 *(45 min)* Worker: entrypoint and container, job runner (`FOR UPDATE SKIP LOCKED`, backoff, `dead` after `max_attempts`), sweep loop ([ADR-0004](adr/0004-postgres-jobs-table.md))
 - [ ] SCRUM-44 *(45 min)* GitHub App service: JWT → installation token (cached), `httpx` + `tenacity`; **dispatch job** with `return_run_details`, storing run id and URL
 - [ ] SCRUM-45 *(45 min)* `POST /github/webhooks`: **HMAC-SHA256 validation with constant-time compare** before parsing, delivery-ID idempotency, run matching (repo, workflow, `run-name`)
 - [ ] SCRUM-37 *(30 min)* Release registration: `POST /releases/ci` (OIDC verification against JWKS, claim binding to repository id, workflow and SHA) and manual `POST /releases`; unique `(application_id, version)`
@@ -346,7 +346,7 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 - **Date:** Sat 28 Nov 2026 (Sprint 2, zero buffer)
 - **Done yesterday (Fri 27 Nov, Sprint 1 closed):** SCRUM-110 login throttling and SCRUM-32 local docker-compose ([#19](https://github.com/hamdounisabri1/releaseguard/pull/19)) · SCRUM-28 login page and auth guard ([#20](https://github.com/hamdounisabri1/releaseguard/pull/20)) · SCRUM-30 and SCRUM-31 applications and environment settings ([#22](https://github.com/hamdounisabri1/releaseguard/pull/22)). Sprint 1 retro: [sprint-1.md](retros/sprint-1.md) (close PR [#25](https://github.com/hamdounisabri1/releaseguard/pull/25))
 - **Today's Tasks (19, all Sprint 2, `today` label set):** SCRUM-35, 39, 40 (TaskFlow repo) · 36, 37, 38, 41, 43 · 42, 44, 45, 52, 46 · 47, 51, 53, 48, 49, 50. About 9.75 h planned (10 h capacity), so 0 h buffer.
-- **Done today (bulk PR, open):** SCRUM-36 schema for releases, deployments, events, integrations, webhook deliveries and jobs
+- **Done today (bulk PR, open):** SCRUM-36 schema for releases, deployments, events, integrations, webhook deliveries and jobs · SCRUM-41 worker (job runner, backoff, dead jobs, lease recovery, retention sweep, compose service)
 - **Order (blockers first):** 09:00–13:00 SCRUM-35 → 39 → 40 → 36 → 37 → 38 → 41 → 43 (4.25 h) · 14:00–17:15 SCRUM-42 → 44 → 45 → 52 → 46 (3 h) · 17:15–19:45 SCRUM-47, 51, 53, 48, 49, 50 (2.5 h)
 - **Carried over:** none
 - **Blocked:** none at the start. The GitHub App dev channel and webhook secret are needed for SCRUM-45 and the dispatch path ([GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)); check them before 14:00.
