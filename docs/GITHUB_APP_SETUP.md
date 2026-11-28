@@ -52,7 +52,7 @@ Go to **Settings → Developer settings → GitHub Apps → New GitHub App** (<h
 | Expire user authorization tokens | leave the default (unused) |
 | Request user authorization (OAuth) during installation | **unchecked** |
 | Enable Device Flow | **unchecked** |
-| Setup URL | *empty* for now. The install callback (`/api/v1/integrations/github/callback`) is built in Sprint 2/3 |
+| Setup URL | The **Settings → GitHub** page once it exists (SCRUM-50); empty until then. GitHub redirects there with `?installation_id=…&setup_action=…`, and the page posts both to `POST /api/v1/integrations/github/callback` (SCRUM-43) with the Admin's session. Before the page exists, post the id from the browser's dev tools or `curl` (Admin session cookie plus `Origin`) |
 | Webhook: Active | **checked** |
 | Webhook URL | the smee channel URL from step 1 |
 | Webhook secret | the value from step 2 |
@@ -184,6 +184,6 @@ Never weaken the endpoint's HMAC check to make a tunnel work.
 ## Production App (SCRUM-95)
 
 Same contract and steps, with these differences:
-- Name `releaseguard-<your-login>`, webhook URL `https://<host>/api/v1/github/webhooks` (no tunnel), Setup URL set to the install callback once it exists.
+- Name `releaseguard-<your-login>`, webhook URL `https://<host>/api/v1/github/webhooks` (no tunnel), Setup URL set to the Settings → GitHub page.
 - New webhook secret and private key. **Never reuse the development values.**
 - The key file lives on the VPS beside the env file (owned by the deploy user, `chmod 600`) and is mounted read-only into the backend and worker containers. `GITHUB_APP_PRIVATE_KEY_PATH` points at the path inside the container.

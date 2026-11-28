@@ -146,6 +146,91 @@ export interface paths {
         patch: operations["update_environment_api_v1_environments__environment_id__patch"];
         trace?: never;
     };
+    "/api/v1/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's integrations, newest first (Admin) */
+        get: operations["list_integrations_api_v1_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/github/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link a GitHub App installation (Admin); the worker verifies it with GitHub */
+        post: operations["github_install_callback_api_v1_integrations_github_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/{integration_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect: dispatches stop at once; the record stays as history (idempotent) */
+        delete: operations["disconnect_integration_api_v1_integrations__integration_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a release manually (Admin/Developer fallback) */
+        post: operations["register_release_api_v1_releases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/releases/ci": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a release from CI with a GitHub Actions OIDC token (ADR-0006) */
+        post: operations["register_ci_release_api_v1_releases_ci_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -437,6 +522,21 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /**
+         * GitHubInstallCallback
+         * @description What GitHub's Setup URL redirect carries (``?installation_id=…&setup_action=…``); the
+         *     frontend posts it here with the Admin's session.
+         */
+        GitHubInstallCallback: {
+            /** Installation Id */
+            installation_id: number;
+            /**
+             * Setup Action
+             * @default install
+             * @enum {string}
+             */
+            setup_action: "install" | "update";
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -451,6 +551,49 @@ export interface components {
          * @enum {string}
          */
         HealthStatus: "unknown" | "healthy" | "unhealthy";
+        /** IntegrationOut */
+        IntegrationOut: {
+            /**
+             * Account Login
+             * @description The GitHub account the App is installed on.
+             */
+            account_login: string | null;
+            /** Connected At */
+            connected_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Disconnected At */
+            disconnected_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Installation Id */
+            installation_id: number;
+            /** Permissions Summary */
+            permissions_summary: {
+                [key: string]: unknown;
+            };
+            provider: components["schemas"]["IntegrationProvider"];
+            /** @description `pending` until the worker confirms the installation with GitHub; `active` once it does (only then are dispatches allowed); `invalid` when GitHub doesn't know it; `disconnected` after an Admin removes it. */
+            status: components["schemas"]["IntegrationStatus"];
+        };
+        /**
+         * IntegrationProvider
+         * @enum {string}
+         */
+        IntegrationProvider: "github";
+        /**
+         * IntegrationStatus
+         * @description ``pending`` until the worker confirms the installation with GitHub; ``invalid`` when it
+         *     doesn't exist for our App; ``disconnected`` after an Admin removes it.
+         * @enum {string}
+         */
+        IntegrationStatus: "pending" | "active" | "invalid" | "disconnected";
         /**
          * LoginRequest
          * @description ``email`` arrives trimmed and lowercased, the form it's stored and throttled in.
@@ -481,6 +624,122 @@ export interface components {
              */
             total: number;
         };
+        /**
+         * ReleaseCiCreate
+         * @description Sent by the application's CI workflow with its OIDC token (ADR-0006).
+         */
+        ReleaseCiCreate: {
+            /** Branch */
+            branch?: string | null;
+            /**
+             * Commit Sha
+             * @description Full 40-character commit SHA.
+             */
+            commit_sha: string;
+            /**
+             * Image Digest
+             * @description The immutable image digest, `sha256:` plus 64 lowercase hex characters. Deployments always pull by this digest, never by tag.
+             */
+            image_digest: string;
+            /** Image Repository */
+            image_repository: string;
+            /** Image Tag */
+            image_tag?: string | null;
+            /**
+             * Version
+             * @description Release version, e.g. `1.4.0` or `2026.11.28-3`.
+             */
+            version: string;
+            /**
+             * Workflow Run Id
+             * @description Must equal the token's `run_id` claim.
+             */
+            workflow_run_id: number;
+        };
+        /**
+         * ReleaseCreate
+         * @description Manual registration (Admin/Developer), the fallback when CI can't register.
+         */
+        ReleaseCreate: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /** Branch */
+            branch?: string | null;
+            /**
+             * Commit Sha
+             * @description Full 40-character commit SHA.
+             */
+            commit_sha: string;
+            /**
+             * Image Digest
+             * @description The immutable image digest, `sha256:` plus 64 lowercase hex characters. Deployments always pull by this digest, never by tag.
+             */
+            image_digest: string;
+            /** Image Repository */
+            image_repository: string;
+            /** Image Tag */
+            image_tag?: string | null;
+            /** Release Notes */
+            release_notes?: string | null;
+            /**
+             * Version
+             * @description Release version, e.g. `1.4.0` or `2026.11.28-3`.
+             */
+            version: string;
+        };
+        /** ReleaseOut */
+        ReleaseOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /** Branch */
+            branch: string | null;
+            /** Commit Sha */
+            commit_sha: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * @description The user, for manual releases.
+             */
+            created_by: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Image Digest */
+            image_digest: string;
+            /** Image Repository */
+            image_repository: string;
+            /** Image Tag */
+            image_tag: string | null;
+            /** Release Notes */
+            release_notes: string | null;
+            source: components["schemas"]["ReleaseSource"];
+            /** Version */
+            version: string;
+            /** Workflow Run Id */
+            workflow_run_id: number | null;
+            /**
+             * Workflow Url
+             * @description The CI run that built it (CI releases only).
+             */
+            workflow_url: string | null;
+        };
+        /**
+         * ReleaseSource
+         * @enum {string}
+         */
+        ReleaseSource: "ci" | "manual";
         /**
          * Role
          * @enum {string}
@@ -1167,6 +1426,325 @@ export interface operations {
             };
             /** @description Validation error. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_integrations_api_v1_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"][];
+                };
+            };
+            /** @description Missing, invalid or expired session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden (role, or foreign `Origin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    github_install_callback_api_v1_integrations_github_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitHubInstallCallback"];
+            };
+        };
+        responses: {
+            /** @description Already linked to this workspace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Missing, invalid or expired session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden (role, or foreign `Origin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Linked elsewhere (`installation_unavailable`), or the workspace already has another one (`integration_exists`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disconnect_integration_api_v1_integrations__integration_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing, invalid or expired session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden (role, or foreign `Origin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found (or in another workspace). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    register_release_api_v1_releases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseOut"];
+                };
+            };
+            /** @description Missing, invalid or expired session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden (role, or foreign `Origin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No such application in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Version exists, or application archived. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    register_ci_release_api_v1_releases_ci_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCiCreate"];
+            };
+        };
+        responses: {
+            /** @description Replay: this version and build exist already. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseOut"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseOut"];
+                };
+            };
+            /** @description Missing, invalid or expired OIDC token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The token's repository, workflow, ref, event, branch, SHA or run doesn't match a registered application (`oidc_binding_mismatch`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The version exists with another build, or the run registered another version already (`release_version_exists`); the repository is bound in more than one workspace (`repository_ambiguous`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description GitHub's OIDC keys are unreachable. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

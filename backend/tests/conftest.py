@@ -54,8 +54,8 @@ def _test_router() -> APIRouter:
     async def echo() -> dict[str, bool]:
         return {"ok": True}
 
-    # The two CSRF-exempt endpoints (the real handlers arrive in later Tasks), plus methods and
-    # paths next to them that must stay protected.
+    # The webhook endpoint is CSRF-exempt (its real handler arrives with SCRUM-45), plus methods
+    # and paths next to it that must stay protected. POST /releases/ci is the real route.
     @router.api_route("/github/webhooks", methods=["POST", "PUT"], include_in_schema=False)
     async def webhooks() -> dict[str, bool]:
         return {"ok": True}
@@ -66,10 +66,6 @@ def _test_router() -> APIRouter:
 
     @router.api_route("/_test/propfind", methods=["PROPFIND"], include_in_schema=False)
     async def propfind() -> dict[str, bool]:
-        return {"ok": True}
-
-    @router.post("/releases/ci")
-    async def releases_ci() -> dict[str, bool]:
         return {"ok": True}
 
     @router.get("/_test/errors/{kind}")

@@ -1,5 +1,6 @@
 """Plain builders for test data. Each one adds rows to the given session and flushes."""
 
+import hashlib
 import uuid
 from functools import lru_cache
 
@@ -7,8 +8,23 @@ from sqlalchemy.orm import Session
 
 from app.core.passwords import hash_password
 from app.core.permissions import Role
-from app.models import Application, Environment, User, Workspace, WorkspaceMember
-from app.models.enums import EnvironmentType
+from app.models import (
+    Application,
+    Deployment,
+    Environment,
+    Integration,
+    Release,
+    User,
+    Workspace,
+    WorkspaceMember,
+)
+from app.models.enums import (
+    DeploymentStatus,
+    EnvironmentType,
+    IntegrationStatus,
+    OperationType,
+    ReleaseSource,
+)
 
 DEFAULT_PASSWORD = "correct horse battery staple"  # noqa: S105 (test fixture)
 
@@ -82,3 +98,65 @@ def make_environment(
     db.add(environment)
     db.flush()
     return environment
+
+
+def digest(seed: str = "") -> str:
+    """A well-formed ``sha256:`` image digest, distinct per seed."""
+    return "sha256:" + hashlib.sha256(seed.encode() or uuid.uuid4().bytes).hexdigest()
+
+
+def make_release(
+    db: Session,
+    application: Application,
+    *,
+    version: str | None = None,
+    image_digest: str | None = None,
+    source: ReleaseSource = ReleaseSource.MANUAL,
+) -> Release:
+    release = Release(
+        workspace_id=application.workspace_id,
+        application_id=application.id,
+        version=version or f"1.0.{uuid.uuid4().int % 100_000}",
+        commit_sha=hashlib.sha1(uuid.uuid4().bytes).hexdigest(),  # noqa: S324 (fake commit)
+        image_repository="ghcr.io/octo/taskflow",
+        image_digest=image_digest or digest(),
+        source=source.value,
+    )
+    db.add(release)
+    db.flush()
+    return release
+
+
+def make_deployment(
+    db: Session,
+    release: Release,
+    environment: Environment,
+    status: DeploymentStatus = DeploymentStatus.QUEUED,
+) -> Deployment:
+    deployment = Deployment(
+        workspace_id=release.workspace_id,
+        release_id=release.id,
+        environment_id=environment.id,
+        operation_type=OperationType.DEPLOY.value,
+        status=status.value,
+    )
+    db.add(deployment)
+    db.flush()
+    return deployment
+
+
+def make_integration(
+    db: Session,
+    workspace: Workspace,
+    *,
+    installation_id: int | None = None,
+    status: IntegrationStatus = IntegrationStatus.ACTIVE,
+) -> Integration:
+    integration = Integration(
+        workspace_id=workspace.id,
+        installation_id=installation_id or uuid.uuid4().int % 10**9 + 1,
+        status=status.value,
+    )
+    db.add(integration)
+    db.flush()
+    return integration

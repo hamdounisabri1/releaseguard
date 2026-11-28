@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=REPO_ROOT_ENV_FILE,
         env_file_encoding="utf-8",
-        # The shared .env also holds worker and GitHub App variables this model doesn't use yet.
+        # The shared .env also holds GitHub App and frontend variables this model doesn't use yet.
         extra="ignore",
         frozen=True,
         # A validation error otherwise echoes the whole input, which includes every .env value
@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     # Peers whose X-Forwarded-For is trusted for the client IP: the Caddy proxy's address or
     # network (IPs or CIDRs, comma-separated). Empty: trust none and use the socket peer.
     trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Expected `aud` of GitHub Actions OIDC tokens for POST /releases/ci (ADR-0006); TaskFlow's
+    # ci.yml requests its token with the same value. Unset: every CI registration is refused.
+    github_oidc_audience: str | None = Field(default=None, min_length=1, max_length=255)
+    # Worker (ADR-0004): how often an idle worker polls the jobs table, how long a claimed job is
+    # leased before another worker may take it over (a crash mid-job), and the exponential
+    # backoff between attempts (base * 2^(attempt-1), capped).
+    worker_poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=60)
+    worker_job_lease_seconds: int = Field(default=300, ge=10, le=3600)
+    worker_backoff_base_seconds: int = Field(default=5, ge=1, le=3600)
+    worker_backoff_max_seconds: int = Field(default=600, ge=1, le=86_400)
 
     @field_validator("site_origin")
     @classmethod

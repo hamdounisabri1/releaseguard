@@ -22,11 +22,18 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import Settings
 from app.core.permissions import Role
+from app.core.security import CSRF_EXEMPT as APP_CSRF_EXEMPT
 from app.main import create_app
-from app.models import Application, AuditLog, Environment, Workspace
-from app.models.enums import EnvironmentType
+from app.models import Application, AuditLog, Environment, Integration, Job, Release, Workspace
+from app.models.enums import EnvironmentType, IntegrationStatus
 from tests.conftest import SITE_ORIGIN, client_for, sign_in
-from tests.factories import make_application, make_environment, make_workspace, make_workspace_user
+from tests.factories import (
+    make_application,
+    make_environment,
+    make_integration,
+    make_workspace,
+    make_workspace_user,
+)
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 FOREIGN_ORIGIN = {"Origin": "https://evil.example"}
@@ -34,8 +41,10 @@ ORIGIN = {"Origin": SITE_ORIGIN}
 
 # Routes that work without a session: login creates one, logout without one is a no-op.
 PUBLIC = {("POST", "/api/v1/auth/login"), ("POST", "/api/v1/auth/logout")}
-# Cookie-less endpoints authenticated by HMAC / OIDC instead (security.md); not built yet.
+# Cookie-less endpoints authenticated by HMAC / OIDC instead (security.md). The session sweeps
+# skip them; test_cookieless_routes_refuse_a_request_without_their_credential covers them.
 CSRF_EXEMPT = {("POST", "/api/v1/github/webhooks"), ("POST", "/api/v1/releases/ci")}
+NO_SESSION = PUBLIC | CSRF_EXEMPT
 
 # A valid body for each write route, so the checks below hit permissions and scoping rather
 # than a 422. A new write route without an entry fails test_every_write_route_has_a_body.
@@ -50,6 +59,22 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/applications/{application_id}"): {"name": "Tampered"},
     ("POST", "/api/v1/applications/{application_id}/archive"): None,
     ("PATCH", "/api/v1/environments/{environment_id}"): {"failure_threshold": 7},
+    ("POST", "/api/v1/integrations/github/callback"): {"installation_id": 424242},
+    ("DELETE", "/api/v1/integrations/{integration_id}"): None,
+    ("POST", "/api/v1/releases"): {
+        "application_id": str(uuid.uuid4()),
+        "version": "9.9.9",
+        "commit_sha": "a" * 40,
+        "image_repository": "ghcr.io/octo/sweep",
+        "image_digest": "sha256:" + "b" * 64,
+    },
+    ("POST", "/api/v1/releases/ci"): {
+        "version": "9.9.9",
+        "commit_sha": "a" * 40,
+        "image_repository": "ghcr.io/octo/sweep",
+        "image_digest": "sha256:" + "b" * 64,
+        "workflow_run_id": 1,
+    },
 }
 
 
@@ -94,17 +119,24 @@ def _ids(db: Session, workspace: Workspace) -> dict[str, uuid.UUID]:
     """One real resource per path parameter, in ``workspace``."""
     application = make_application(db, workspace)
     environment = make_environment(db, application, EnvironmentType.PRODUCTION)
-    return {"application_id": application.id, "environment_id": environment.id}
+    integration = make_integration(db, workspace, status=IntegrationStatus.ACTIVE)
+    return {
+        "application_id": application.id,
+        "environment_id": environment.id,
+        "integration_id": integration.id,
+    }
 
 
-def _snapshot(db: Session) -> tuple[int, int]:
-    """Row counts a refused request must not change: audit entries and applications."""
-    audits = db.scalar(select(func.count()).select_from(AuditLog)) or 0
-    applications = db.scalar(select(func.count()).select_from(Application)) or 0
-    return audits, applications
+# Tables a refused request must not add rows to.
+_COUNTED = (AuditLog, Application, Integration, Job, Release)
 
 
-def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int, int]) -> None:
+def _snapshot(db: Session) -> tuple[int, ...]:
+    """Row counts a refused request must not change."""
+    return tuple(db.scalar(select(func.count()).select_from(t)) or 0 for t in _COUNTED)
+
+
+def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int, ...]) -> None:
     """Nothing was written: same counts, and the test resources still hold their values.
 
     Re-read from the database (``expire_all``), not from the session's identity map.
@@ -116,6 +148,8 @@ def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int,
     assert application is not None and environment is not None
     assert application.name == "TaskFlow" and application.archived_at is None
     assert environment.failure_threshold != 7  # the value BODIES tries to set
+    integration = db.get(Integration, ids["integration_id"])
+    assert integration is not None and integration.status == IntegrationStatus.ACTIVE.value
 
 
 async def _send(
@@ -162,7 +196,26 @@ def test_every_write_route_has_a_body() -> None:
 def test_the_exception_lists_name_real_routes() -> None:
     # A typo here would silently exempt nothing (or the wrong thing).
     assert set(ROUTES) >= PUBLIC
-    assert not (CSRF_EXEMPT & set(ROUTES)), "an exempt route exists now: sweep it with HMAC/OIDC"
+    assert CSRF_EXEMPT == APP_CSRF_EXEMPT  # the middleware's list, not a copy that drifted
+
+
+# --- Cookie-less routes: a session is no substitute for their own credential --------------
+
+
+@pytest.mark.parametrize("route", [r for r in ROUTES if r in CSRF_EXEMPT], ids=_route_id)
+async def test_cookieless_routes_refuse_a_request_without_their_credential(
+    sweep_client: AsyncClient, db: Session, route: tuple[str, str]
+) -> None:
+    workspace = make_workspace(db)
+    admin = make_workspace_user(db, workspace, Role.ADMIN)
+    sign_in(sweep_client, db, admin.id, workspace.id)  # an Admin cookie, but no token/signature
+    ids = _ids(db, workspace)
+    before = _snapshot(db)
+
+    response = await _send(sweep_client, route, ids, FOREIGN_ORIGIN)
+
+    assert response.status_code == 401, response.text
+    _assert_untouched(db, ids, before)
 
 
 # --- CSRF: a foreign Origin is refused on every write, even with a valid session ------------
@@ -188,7 +241,7 @@ async def test_every_write_refuses_a_foreign_origin(
 # --- Authentication: everything but login/logout needs a session ----------------------------
 
 
-@pytest.mark.parametrize("route", [r for r in ROUTES if r not in PUBLIC], ids=_route_id)
+@pytest.mark.parametrize("route", [r for r in ROUTES if r not in NO_SESSION], ids=_route_id)
 async def test_every_route_needs_a_session(
     sweep_client: AsyncClient, db: Session, route: tuple[str, str]
 ) -> None:
@@ -205,7 +258,7 @@ async def test_every_route_needs_a_session(
 # --- RBAC: a Viewer can read but never write ----------------------------------------------
 
 
-@pytest.mark.parametrize("route", [r for r in WRITE_ROUTES if r not in PUBLIC], ids=_route_id)
+@pytest.mark.parametrize("route", [r for r in WRITE_ROUTES if r not in NO_SESSION], ids=_route_id)
 async def test_a_viewer_cannot_use_any_write_route(
     sweep_client: AsyncClient, db: Session, route: tuple[str, str]
 ) -> None:

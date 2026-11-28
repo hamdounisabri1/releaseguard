@@ -180,15 +180,15 @@ Each Task carries its estimate in hours next to its key, *(1 h)*; each sprint he
 - [ ] SCRUM-39 *(30 min)* Deploy target: TaskFlow Compose projects per environment on the VPS (or a free container host) over SSH, pulling by digest
 
 **Backend and worker**
-- [ ] SCRUM-36 *(30 min)* Migration: `releases`, `deployments` (incl. the **partial unique index** on active statuses), `deployment_events` (append-only), `integrations`, `webhook_deliveries`, `jobs`
-- [ ] SCRUM-41 *(45 min)* Worker: entrypoint and container, job runner (`FOR UPDATE SKIP LOCKED`, backoff, `dead` after `max_attempts`), sweep loop ([ADR-0004](adr/0004-postgres-jobs-table.md))
+- [x] SCRUM-36 *(30 min)* Migration: `releases`, `deployments` (incl. the **partial unique index** on active statuses), `deployment_events` (append-only), `integrations`, `webhook_deliveries`, `jobs`
+- [x] SCRUM-41 *(45 min)* Worker: entrypoint and container, job runner (`FOR UPDATE SKIP LOCKED`, backoff, `dead` after `max_attempts`), sweep loop ([ADR-0004](adr/0004-postgres-jobs-table.md))
 - [ ] SCRUM-44 *(45 min)* GitHub App service: JWT → installation token (cached), `httpx` + `tenacity`; **dispatch job** with `return_run_details`, storing run id and URL
 - [ ] SCRUM-45 *(45 min)* `POST /github/webhooks`: **HMAC-SHA256 validation with constant-time compare** before parsing, delivery-ID idempotency, run matching (repo, workflow, `run-name`)
-- [ ] SCRUM-37 *(30 min)* Release registration: `POST /releases/ci` (OIDC verification against JWKS, claim binding to repository id, workflow and SHA) and manual `POST /releases`; unique `(application_id, version)`
+- [x] SCRUM-37 *(30 min)* Release registration: `POST /releases/ci` (OIDC verification against JWKS, claim binding to repository id, workflow and SHA) and manual `POST /releases`; unique `(application_id, version)`
 - [ ] SCRUM-42 *(45 min)* `deployment_service` with the **state machine** (`ALLOWED_TRANSITIONS`, `transition()` that writes events and audit entries and enqueues follow-up jobs); `current_deployment_id` set on entering Verifying
 - [ ] SCRUM-46 *(30 min)* Auto-deploy on release (dev policy) and `POST /deployments` for staging; Verifying → Succeeded is immediate until verification lands in S4
 - [ ] SCRUM-47 *(30 min)* Reconcile sweep: read stuck runs from the API; `run_not_found` after `DISPATCH_TIMEOUT_SECONDS`
-- [ ] SCRUM-43 *(15 min)* GitHub integration connect and disconnect (installation callback, store `installation_id`)
+- [x] SCRUM-43 *(15 min)* GitHub integration connect and disconnect (installation callback, store `installation_id`)
 
 **Frontend**
 - [ ] SCRUM-48 *(30 min)* Releases list and release details (version, SHA, digest, source, workflow link, deployments)
@@ -343,15 +343,15 @@ Jira project **`SCRUM`** is the only work tracker (one board sprint plus one Epi
 
 ### Today
 <!-- Claude rewrites this block in the first session of each day (jira-workflow.md §4). -->
-- **Date:** Fri 27 Nov 2026
-- **Done yesterday (merged in PR #17):** SCRUM-27 API client, generated types, TanStack Query · SCRUM-29 shared UI states · SCRUM-33 CI workflow and required checks · SCRUM-34 route-wide security sweeps
-- **Done today (morning):** SCRUM-110 login throttling · SCRUM-32 local docker-compose (one PR for both, [#19](https://github.com/hamdounisabri1/releaseguard/pull/19), merged; Jira Done)
-- **Done today (afternoon):** SCRUM-28 login page, auth guard (`proxy.ts` + `AuthGuard`), sign-out and dashboard placeholder (merged) · SCRUM-30 applications list (search, create, archive) and details with environments tab · SCRUM-31 environment settings form (one bulk PR for both)
-- **Today's Tasks:** SCRUM-110, SCRUM-32 and SCRUM-28 done · SCRUM-30 applications list and details (1.5 h) · SCRUM-31 environment settings form (1 h). Two Tasks left, 2.5 h planned.
+- **Date:** Sat 28 Nov 2026 (Sprint 2, zero buffer)
+- **Done yesterday (Fri 27 Nov, Sprint 1 closed):** SCRUM-110 login throttling and SCRUM-32 local docker-compose ([#19](https://github.com/hamdounisabri1/releaseguard/pull/19)) · SCRUM-28 login page and auth guard ([#20](https://github.com/hamdounisabri1/releaseguard/pull/20)) · SCRUM-30 and SCRUM-31 applications and environment settings ([#22](https://github.com/hamdounisabri1/releaseguard/pull/22)). Sprint 1 retro: [sprint-1.md](retros/sprint-1.md) (close PR [#25](https://github.com/hamdounisabri1/releaseguard/pull/25))
+- **Today's Tasks (19, all Sprint 2, `today` label set):** SCRUM-35, 39, 40 (TaskFlow repo) · 36, 37, 38, 41, 43 · 42, 44, 45, 52, 46 · 47, 51, 53, 48, 49, 50. About 9.75 h planned (10 h capacity), so 0 h buffer.
+- **Done today (bulk PR, open):** SCRUM-36 schema for releases, deployments, events, integrations, webhook deliveries and jobs · SCRUM-41 worker (job runner, backoff, dead jobs, lease recovery, retention sweep, compose service) · SCRUM-43 GitHub integration connect (pending, verified by the worker), list and disconnect · SCRUM-37 release registration (OIDC `POST /releases/ci` and manual `POST /releases`)
+- **Order (blockers first):** 09:00–13:00 SCRUM-35 → 39 → 40 → 36 → 37 → 38 → 41 → 43 (4.25 h) · 14:00–17:15 SCRUM-42 → 44 → 45 → 52 → 46 (3 h) · 17:15–19:45 SCRUM-47, 51, 53, 48, 49, 50 (2.5 h)
 - **Carried over:** none
-- **Blocked:** none (SCRUM-30 waits for SCRUM-28 in today's order, SCRUM-31 for SCRUM-30)
-- **Next:** merge the SCRUM-30/31 bulk PR; the sprint closes when both are Done → `v0.1.0`
-- **Schedule:** morning block done on plan. Afternoon: 3.5 h of Tasks inside the 14:00–18:30 blocks plus the buffer. Sprint 1 closes today at 18:30 (`v0.1.0`).
+- **Blocked:** none at the start. The GitHub App dev channel and webhook secret are needed for SCRUM-45 and the dispatch path ([GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md)); check them before 14:00.
+- **Next:** close PR #25 merges → offer `v0.1.0`. SCRUM-35/39/40 are PRs in the `taskflow` repo; the rest in this repo, bulk per block.
+- **Schedule:** on the timetable. Risk triggers from §6: no release registered by 17:15 → move manual `POST /releases` and the integration settings page to Sprint 3; no run dispatched by 17:15 → same move, keep the dispatch → webhook → timeline path; deploy target unclear at 11:00 → use the VPS with `taskflow-dev/staging/prod` compose projects.
 
 ### Labels
 | Group | Labels |

@@ -35,6 +35,11 @@ class Actor:
     def system(cls, workspace_id: uuid.UUID) -> Self:
         return cls(workspace_id=workspace_id, type=ActorType.SYSTEM)
 
+    @classmethod
+    def ci(cls, workspace_id: uuid.UUID) -> Self:
+        """A CI workflow authenticated by its OIDC token (no ReleaseGuard user)."""
+        return cls(workspace_id=workspace_id, type=ActorType.CI)
+
 
 @dataclass(frozen=True, slots=True)
 class AuditTarget:

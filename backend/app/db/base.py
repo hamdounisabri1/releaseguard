@@ -1,5 +1,6 @@
 """Declarative base and the constraint naming convention shared by models and migrations."""
 
+from collections.abc import Iterable
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, MetaData
@@ -17,6 +18,11 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+def sql_values(values: Iterable[StrEnum]) -> str:
+    """``'a', 'b'`` (sorted) for an ``IN (...)`` list, e.g. a partial index's ``WHERE``."""
+    return ", ".join(f"'{value}'" for value in sorted(member.value for member in values))
 
 
 def check_in(column: str, values: type[StrEnum]) -> CheckConstraint:

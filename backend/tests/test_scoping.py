@@ -8,9 +8,17 @@ import pkgutil
 
 import app.repositories
 
-# Lookups that run before the caller's workspace is known (login, session cookie). Nothing else
-# belongs on this list.
-UNSCOPED_REPOSITORIES = {"app.repositories.identity"}
+# Each entry needs a reason; nothing else belongs on this list.
+UNSCOPED_REPOSITORIES = {
+    # Lookups that run before the caller's workspace is known (login, session cookie).
+    "app.repositories.identity",
+    # The worker's claim/finish queries: it serves every workspace, and each job carries its own
+    # workspace_id for the scoped repositories its handler calls.
+    "app.repositories.job_queue",
+    # POST /releases/ci: a CI caller has no session; its verified token's repository_id names the
+    # application (and so the workspace).
+    "app.repositories.ci_identity",
+}
 
 
 def _tenant_repositories() -> list[str]:

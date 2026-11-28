@@ -541,11 +541,13 @@ erDiagram
         uuid id PK
         uuid workspace_id FK
         string provider "github"
-        bigint installation_id UK
+        bigint installation_id "UK while pending or active"
         string account_login
         jsonb permissions_summary
-        string status
+        string status "pending|active|invalid|disconnected"
+        timestamptz created_at
         timestamptz connected_at
+        timestamptz disconnected_at
     }
     applications {
         uuid id PK
@@ -595,6 +597,7 @@ erDiagram
         string image_digest "sha256:..."
         string source "ci|manual"
         bigint workflow_run_id
+        string workflow_url "from the OIDC claims"
         uuid created_by FK
         text release_notes
         timestamptz created_at
@@ -703,9 +706,9 @@ Two infrastructure tables sit outside the diagram:
 ### 7.3 Integrity, indexing and conventions
 - Foreign keys on every relationship; never cascade-delete deployment, decision, event or audit history.
 - **CHECK constraints** on every status, decision, role, kind and `operation_type` value (mirrored in Python enums), and on `image_digest ~ '^sha256:[0-9a-f]{64}$'`.
-- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on active applications (partial index; archiving frees the repository), `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null).
+- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on active applications (partial index; archiving frees the repository), `(application_id, environment_type)` on environments, `(application_id, version)` on releases (plus `(application_id, workflow_run_id)` where `source = 'ci'`: one release per CI run), `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null), and on integrations `installation_id` and `(workspace_id, provider)` while `pending` or `active` (partial indexes: an installation is linked to one workspace at a time, and a disconnected one can be linked again).
 - **Single active deployment per environment:** `CREATE UNIQUE INDEX deployments_one_active_per_env ON deployments (environment_id) WHERE status IN ('queued','deploying','verifying')`. A unique violation maps to **409**.
-- **Indexes:** `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
+- **Indexes:** `deployment_events (deployment_id, created_at)`, `jobs (locked_until) WHERE status = 'running'` (lease recovery), `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
 - **Append-only history:** a trigger rejects `UPDATE` and `DELETE` on `audit_logs` and `deployment_events`.
 - **Transactions** wrap "decision + transition + dispatch job" and every other state change with the jobs it implies.
 - **All timestamps are stored in UTC** (`timestamptz`) and rendered in the user's local timezone.
@@ -789,14 +792,14 @@ Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset
 | Applications | `GET/POST /applications` · `GET/PATCH /applications/{id}` · `POST /applications/{id}/archive` | Application CRUD | Viewer / Developer |
 | Environments | `GET /applications/{id}/environments` · `GET/PATCH /environments/{id}` | Health config and environment **policy** | Viewer / Admin |
 | Releases | `GET /applications/{id}/releases` · `GET /releases/{id}` · `POST /releases` | List, view, manual registration (fallback) | Viewer / Developer |
-| | `POST /releases/ci` | CI registration with a **GitHub OIDC bearer token**; no session | CI (OIDC) |
+| | `POST /releases/ci` | CI registration with a **GitHub OIDC bearer token**; no session. 201 created, 200 replay of the same version and build, 401 bad token, 403 claims don't match an application (`oidc_binding_mismatch`), 409 version taken by another build | CI (OIDC) |
 | Deployments | `GET /deployments?app=&env=&status=&actor=&from=&to=` · `GET /deployments/{id}` · `GET /deployments/{id}/events` | History, details, timeline | Viewer |
 | | `POST /deployments` (`Idempotency-Key` header) · `POST /deployments/{id}/cancel` | Request a deployment (created Awaiting approval or Queued); cancel before dispatch | Developer |
 | Approvals | `GET /approvals?status=pending` | Inbox: deployments in Awaiting approval, with release and promotion evidence | Viewer |
 | | `POST /deployments/{id}/decisions` | Approve or reject with comment | Reviewer |
 | Rollbacks | `GET /environments/{id}/rollback-candidates` · `POST /rollbacks` | Eligible releases; start a rollback (target release, reason) | Developer |
 | Health | `GET /environments/{id}/health` · `GET /environments/{id}/health-checks` · `POST /environments/{id}/health/check-now` | Current status, history, enqueue an immediate check | Viewer / Admin |
-| GitHub | `POST /github/webhooks` (HMAC-verified, no session) · `GET /integrations` · `POST /integrations/github/callback` · `DELETE /integrations/{id}` | Webhook intake; App install and uninstall | system / Admin |
+| GitHub | `POST /github/webhooks` (HMAC-verified, no session) · `GET /integrations` · `POST /integrations/github/callback` (202 `pending`, verified by the worker; 200 if already linked here) · `DELETE /integrations/{id}` (204, idempotent) | Webhook intake; App install and uninstall | system / Admin |
 | AI | `POST /deployments/{id}/ai-analysis` · `GET /deployments/{id}/ai-analysis` · `POST /releases/{id}/release-notes` | Enqueue or view AI analysis and release notes | Viewer / Developer |
 | Audit | `GET /audit-logs?target_type=&target_id=&actor=` | Audit trail | Viewer |
 | Ops | `GET /healthz` · `GET /readyz` | Liveness and readiness of ReleaseGuard itself | public |
@@ -856,7 +859,7 @@ sequenceDiagram
 - **Dispatch** is a job. The worker calls the dispatch API with `return_run_details: true` and stores the returned run id and URL, then moves the deployment to Deploying. Transient errors retry with backoff; after `max_attempts` the deployment becomes Failed (`dispatch_failed`). *(Check the response field names against the live API when implementing; the feature shipped in Feb 2026.)*
 - **Status** arrives through signed `workflow_run` webhooks. Each event is accepted only if its repository id, workflow path and `run-name` (`deploy-<deployment_id>`) match the deployment; otherwise it is logged and ignored.
 - **Reconcile sweep** (worker, every 60 s): a deployment in Deploying with no update for 5 minutes has its run read from the API. If the run concluded, apply the result. If no run exists after `DISPATCH_TIMEOUT_SECONDS`, mark it Failed (`run_not_found`). This covers lost webhooks and tunnel outages.
-- **Release registration:** `POST /releases/ci` verifies the OIDC JWT against GitHub's JWKS (`iss`, `aud` = `GITHUB_OIDC_AUDIENCE`, `exp`) and binds it to the application: `repository_id` equals the stored repository id, `workflow_ref` is the configured CI workflow on the default branch or a tag, and `sha` equals the body's commit SHA ([ADR-0006](adr/0006-release-registration-via-oidc.md)).
+- **Release registration:** `POST /releases/ci` verifies the OIDC JWT against GitHub's JWKS (`iss`, `aud` = `GITHUB_OIDC_AUDIENCE`, `exp`) and binds it to the application: `repository_id` equals the stored repository id, `workflow_ref` is the configured CI workflow on the default branch or a tag, and `sha` equals the body's commit SHA ([ADR-0006](adr/0006-release-registration-via-oidc.md)). The body's `workflow_run_id` must equal the token's `run_id`, the workflow's repository part comes from the token's `repository` claim (so a renamed repository still matches by id), and the release's `workflow_url` is built from the claims, never from the body. Only `push` and `workflow_dispatch` runs may register (`pull_request_target` and `workflow_run` run the default branch's workflow file but can build untrusted code), the release's `branch` comes from the token's `ref` (a body value must agree), and each CI run registers at most one release. A repository id bound to active applications in two workspaces is refused (409 `repository_ambiguous`). Tags are accepted as ADR-0006 allows: protect release tags in GitHub (tag rulesets) so only maintainers can push them. Code: `app/core/oidc.py` (verification), `app/services/release_service.py` (binding).
 
 ### 10.4 GitHub App
 - **Permissions:** Actions read/write (dispatch, runs, logs), Contents read, Metadata read. Nothing else.
@@ -982,7 +985,8 @@ ReleaseGuard has authority over production release decisions, so security is par
 - Validate webhook signatures with **HMAC-SHA256** (`X-Hub-Signature-256`) and a **constant-time comparison**, before parsing the body.
 - Reject duplicate deliveries using `X-GitHub-Delivery` IDs.
 - Authenticate CI release registration with **GitHub OIDC** and bind the token's `repository_id`, `workflow_ref` and `sha` to the application. No shared secret.
-- Rotate and revoke credentials when an integration is disconnected.
+- **The install callback is untrusted** (its `installation_id` comes from a browser redirect): `POST /integrations/github/callback` (Admin) only records a `pending` link and enqueues `github.verify_installation`; the worker asks GitHub (`GET /app/installations/{id}` with the App JWT) and marks it `active` or `invalid`. Only `active` installations are used. An installation linked (pending or active) to one workspace is refused for any other (409 `installation_unavailable`, without naming the holder). Known gap: an Admin could link an installation of our App that nobody has linked yet but that belongs to another GitHub account; closing it needs a user-to-server OAuth check during install (backlog).
+- Rotate and revoke credentials when an integration is disconnected: disconnecting makes the installation unusable at once (dispatch reads only `active` integrations), and cached installation tokens are dropped with it (SCRUM-44).
 
 ### 13.3 Deployment safety
 - No arbitrary deployment commands from users or from AI output.
@@ -1096,8 +1100,9 @@ docker compose -f infra/docker-compose.yml up -d --wait   # db + backend (migrat
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…`. Required. Tests use `TEST_DATABASE_URL` (a separate database, rebuilt from the migrations each run) |
 | `SEED_PASSWORD` | seed script | Password of the seeded local users (default `releaseguard-dev`). The seed refuses `ENV=production` |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
-| `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
+| `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret. Unset: `POST /releases/ci` refuses every token (fails closed) |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
+| `WORKER_POLL_INTERVAL_SECONDS`, `WORKER_JOB_LEASE_SECONDS`, `WORKER_BACKOFF_BASE_SECONDS`, `WORKER_BACKOFF_MAX_SECONDS` | worker | Idle poll (1 s), job lease before another worker may re-run a crashed job (300 s), retry backoff base · 2^(attempt−1) capped (5 s, 600 s) |
 | `DISPATCH_TIMEOUT_SECONDS` | worker | How long a deployment may wait for its GitHub run before `run_not_found` (default 600) |
 | `HEALTH_CHECK_ALLOW_PRIVATE` | worker | `true` only in local dev, to allow health URLs on private addresses (default `false`) |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | worker | AI can be disabled by leaving the key empty |

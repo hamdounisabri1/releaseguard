@@ -84,6 +84,14 @@ class Environment(Base):
         CheckConstraint("verify_timeout_seconds >= 10", name="verify_timeout_seconds"),
         CheckConstraint("consecutive_failures >= 0", name="consecutive_failures"),
         Index("ix_environments_next_check_at", "next_check_at"),
+        # The deployment whose artifact is live (set on entering Verifying). deployments points
+        # back at environments, so this FK is created after both tables (use_alter).
+        ForeignKeyConstraint(
+            ["current_deployment_id", "workspace_id"],
+            ["deployments.id", "deployments.workspace_id"],
+            name="fk_environments_current_deployment_id_deployments",
+            use_alter=True,
+        ),
     )
 
     id: Mapped[UuidPk]
@@ -100,7 +108,6 @@ class Environment(Base):
     verify_timeout_seconds: Mapped[int] = mapped_column(server_default=text("300"))
     # Environment policy (guide §4.4); its shape is ``app.schemas.environments.EnvironmentPolicy``.
     policy: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
-    # The FK to deployments arrives with that table's migration (the two reference each other).
     current_deployment_id: Mapped[uuid.UUID | None]
     health_status: Mapped[str] = mapped_column(
         String(20), server_default=HealthStatus.UNKNOWN.value
