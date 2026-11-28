@@ -142,8 +142,10 @@ async def test_cookieless_endpoints_are_exempt(client: AsyncClient, path: str) -
     response = await client.post(path, headers={"Origin": "https://evil.example"})
     no_origin = await client.post(path)
 
-    assert response.status_code == 200
-    assert no_origin.status_code == 200
+    # Past the Origin check: the stub webhook answers 200, /releases/ci asks for its OIDC token.
+    for result in (response, no_origin):
+        assert result.status_code in (200, 401), result.text
+        assert "csrf_origin_mismatch" not in result.text
 
 
 async def test_cors_origin_is_allowed_in_local() -> None:

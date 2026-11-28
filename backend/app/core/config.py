@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Peers whose X-Forwarded-For is trusted for the client IP: the Caddy proxy's address or
     # network (IPs or CIDRs, comma-separated). Empty: trust none and use the socket peer.
     trusted_proxies: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Expected `aud` of GitHub Actions OIDC tokens for POST /releases/ci (ADR-0006); TaskFlow's
+    # ci.yml requests its token with the same value. Unset: every CI registration is refused.
+    github_oidc_audience: str | None = Field(default=None, min_length=1, max_length=255)
     # Worker (ADR-0004): how often an idle worker polls the jobs table, how long a claimed job is
     # leased before another worker may take it over (a crash mid-job), and the exponential
     # backoff between attempts (base * 2^(attempt-1), capped).

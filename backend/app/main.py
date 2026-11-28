@@ -9,6 +9,7 @@ from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.oidc import OidcVerifier
 from app.core.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from app.core.security import OriginCheckMiddleware
 from app.db.session import create_db_engine, create_session_factory
@@ -32,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # (/readyz reports it).
     app.state.engine = create_db_engine(settings.database_url)
     app.state.session_factory = create_session_factory(app.state.engine)
+    # Verifies CI tokens for POST /releases/ci; fetches GitHub's JWKS lazily, on first use.
+    app.state.oidc_verifier = OidcVerifier.for_github(settings.github_oidc_audience)
 
     register_exception_handlers(app)
 

@@ -43,7 +43,7 @@ paths:
 ## Integrations
 - Make external HTTP calls with `httpx` (explicit timeouts) wrapped in `tenacity` bounded retries. Never call GitHub or AI inside a request that holds a DB transaction open.
 - GitHub App: sign the JWT with `PyJWT`, exchange it for an installation token, and cache the token until shortly before expiry. Only worker code calls GitHub.
-- CI release registration (`POST /releases/ci`): verify the OIDC JWT with `PyJWKClient` (cached JWKS), check `iss`, `aud`, `exp`, then bind `repository_id`, `workflow_ref` and `sha` to the application (ADR-0006).
+- CI release registration (`POST /releases/ci`): verify the OIDC JWT with `PyJWKClient` (cached JWKS), check `iss`, `aud`, `exp`, then bind `repository_id`, `workflow_ref` and `sha` to the application (ADR-0006). The JWKS fetch is the API's **only** outbound call (lazy, 5 s timeout, cached 10 min). The route takes `CiClaims` from `app/api/deps.py`; tests override `get_oidc_verifier` with a local key set.
 
 ## Worker (ADR-0004)
 - Same codebase, its own entrypoint (`python -m app.worker`). One async loop: claim due rows from `jobs` with `SELECT … FOR UPDATE SKIP LOCKED`, set `locked_until`, run the handler for its `kind`, then mark `done` or reschedule with exponential backoff; `dead` after `max_attempts`. No APScheduler.

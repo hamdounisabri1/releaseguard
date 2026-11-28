@@ -15,6 +15,9 @@ UNSCOPED_REPOSITORIES = {
     # The worker's claim/finish queries: it serves every workspace, and each job carries its own
     # workspace_id for the scoped repositories its handler calls.
     "app.repositories.job_queue",
+    # POST /releases/ci: a CI caller has no session; its verified token's repository_id names the
+    # application (and so the workspace).
+    "app.repositories.ci_identity",
 }
 
 

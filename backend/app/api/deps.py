@@ -1,13 +1,17 @@
-"""Shared FastAPI dependencies: the database session and the authenticated caller."""
+"""Shared FastAPI dependencies: the database session, the authenticated caller, and the CI
+caller's verified OIDC claims.
+"""
 
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Annotated
 
 import structlog
 from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.errors import ForbiddenError, UnauthorizedError
+from app.core.oidc import GitHubOidcClaims, InvalidOidcTokenError, OidcVerifier
 from app.core.permissions import Capability, Role, roles_with
 from app.services import auth_service
 from app.services.auth_service import SESSION_COOKIE, Principal
@@ -66,3 +70,38 @@ def require_capability(capability: Capability) -> Callable[[Principal], Awaitabl
     Prefer this over ``require_role``: the matrix stays the single source of truth.
     """
     return require_role(*roles_with(capability))
+
+
+_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="GitHubOidc",
+    description="A GitHub Actions OIDC token (audience `GITHUB_OIDC_AUDIENCE`).",
+)
+
+
+def get_oidc_verifier(request: Request) -> OidcVerifier:
+    verifier: OidcVerifier = request.app.state.oidc_verifier
+    return verifier
+
+
+def _ci_claims(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
+) -> GitHubOidcClaims:
+    """Plain ``def``: the first verification may fetch GitHub's JWKS (blocking)."""
+    if credentials is None:
+        raise InvalidOidcTokenError()
+    return verifier.verify(credentials.credentials)
+
+
+async def get_ci_claims(
+    claims: Annotated[GitHubOidcClaims, Depends(_ci_claims)],
+) -> GitHubOidcClaims:
+    """The CI caller's verified claims, or 401. Bound to the log context like ``get_principal``."""
+    structlog.contextvars.bind_contextvars(
+        repository_id=claims.repository_id, workflow_run_id=claims.run_id
+    )
+    return claims
+
+
+CiClaims = Annotated[GitHubOidcClaims, Depends(get_ci_claims)]

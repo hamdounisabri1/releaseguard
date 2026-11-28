@@ -792,7 +792,7 @@ Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset
 | Applications | `GET/POST /applications` · `GET/PATCH /applications/{id}` · `POST /applications/{id}/archive` | Application CRUD | Viewer / Developer |
 | Environments | `GET /applications/{id}/environments` · `GET/PATCH /environments/{id}` | Health config and environment **policy** | Viewer / Admin |
 | Releases | `GET /applications/{id}/releases` · `GET /releases/{id}` · `POST /releases` | List, view, manual registration (fallback) | Viewer / Developer |
-| | `POST /releases/ci` | CI registration with a **GitHub OIDC bearer token**; no session | CI (OIDC) |
+| | `POST /releases/ci` | CI registration with a **GitHub OIDC bearer token**; no session. 201 created, 200 replay of the same version and build, 401 bad token, 403 claims don't match an application (`oidc_binding_mismatch`), 409 version taken by another build | CI (OIDC) |
 | Deployments | `GET /deployments?app=&env=&status=&actor=&from=&to=` · `GET /deployments/{id}` · `GET /deployments/{id}/events` | History, details, timeline | Viewer |
 | | `POST /deployments` (`Idempotency-Key` header) · `POST /deployments/{id}/cancel` | Request a deployment (created Awaiting approval or Queued); cancel before dispatch | Developer |
 | Approvals | `GET /approvals?status=pending` | Inbox: deployments in Awaiting approval, with release and promotion evidence | Viewer |
@@ -859,7 +859,7 @@ sequenceDiagram
 - **Dispatch** is a job. The worker calls the dispatch API with `return_run_details: true` and stores the returned run id and URL, then moves the deployment to Deploying. Transient errors retry with backoff; after `max_attempts` the deployment becomes Failed (`dispatch_failed`). *(Check the response field names against the live API when implementing; the feature shipped in Feb 2026.)*
 - **Status** arrives through signed `workflow_run` webhooks. Each event is accepted only if its repository id, workflow path and `run-name` (`deploy-<deployment_id>`) match the deployment; otherwise it is logged and ignored.
 - **Reconcile sweep** (worker, every 60 s): a deployment in Deploying with no update for 5 minutes has its run read from the API. If the run concluded, apply the result. If no run exists after `DISPATCH_TIMEOUT_SECONDS`, mark it Failed (`run_not_found`). This covers lost webhooks and tunnel outages.
-- **Release registration:** `POST /releases/ci` verifies the OIDC JWT against GitHub's JWKS (`iss`, `aud` = `GITHUB_OIDC_AUDIENCE`, `exp`) and binds it to the application: `repository_id` equals the stored repository id, `workflow_ref` is the configured CI workflow on the default branch or a tag, and `sha` equals the body's commit SHA ([ADR-0006](adr/0006-release-registration-via-oidc.md)).
+- **Release registration:** `POST /releases/ci` verifies the OIDC JWT against GitHub's JWKS (`iss`, `aud` = `GITHUB_OIDC_AUDIENCE`, `exp`) and binds it to the application: `repository_id` equals the stored repository id, `workflow_ref` is the configured CI workflow on the default branch or a tag, and `sha` equals the body's commit SHA ([ADR-0006](adr/0006-release-registration-via-oidc.md)). The body's `workflow_run_id` must equal the token's `run_id`, the workflow's repository part comes from the token's `repository` claim (so a renamed repository still matches by id), and the release's `workflow_url` is built from the claims, never from the body. A repository id bound to active applications in two workspaces is refused (409 `repository_ambiguous`). Code: `app/core/oidc.py` (verification), `app/services/release_service.py` (binding).
 
 ### 10.4 GitHub App
 - **Permissions:** Actions read/write (dispatch, runs, logs), Contents read, Metadata read. Nothing else.
@@ -1100,7 +1100,7 @@ docker compose -f infra/docker-compose.yml up -d --wait   # db + backend (migrat
 | `DATABASE_URL` | backend, worker | `postgresql+psycopg://…`. Required. Tests use `TEST_DATABASE_URL` (a separate database, rebuilt from the migrations each run) |
 | `SEED_PASSWORD` | seed script | Password of the seeded local users (default `releaseguard-dev`). The seed refuses `ENV=production` |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY_PATH`, `GITHUB_WEBHOOK_SECRET` | backend, worker | **Backend only.** Never `NEXT_PUBLIC_*`. The key is a `.pem` file outside the repo (mounted read-only in containers); the variable holds its path. Setup: [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md) |
-| `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret |
+| `GITHUB_OIDC_AUDIENCE` | backend | Expected `aud` of CI OIDC tokens (for example `releaseguard`); not secret. Unset: `POST /releases/ci` refuses every token (fails closed) |
 | `SITE_ORIGIN` | backend | The public origin (`https://<host>`) for the CSRF Origin check |
 | `WORKER_POLL_INTERVAL_SECONDS`, `WORKER_JOB_LEASE_SECONDS`, `WORKER_BACKOFF_BASE_SECONDS`, `WORKER_BACKOFF_MAX_SECONDS` | worker | Idle poll (1 s), job lease before another worker may re-run a crashed job (300 s), retry backoff base · 2^(attempt−1) capped (5 s, 600 s) |
 | `DISPATCH_TIMEOUT_SECONDS` | worker | How long a deployment may wait for its GitHub run before `run_not_found` (default 600) |
