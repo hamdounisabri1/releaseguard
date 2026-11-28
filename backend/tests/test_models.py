@@ -22,6 +22,13 @@ TABLES = {
     "applications",
     "environments",
     "audit_logs",
+    "login_attempts",
+    "releases",
+    "deployments",
+    "deployment_events",
+    "integrations",
+    "webhook_deliveries",
+    "jobs",
 }
 
 

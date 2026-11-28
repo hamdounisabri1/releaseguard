@@ -541,11 +541,13 @@ erDiagram
         uuid id PK
         uuid workspace_id FK
         string provider "github"
-        bigint installation_id UK
+        bigint installation_id "UK while pending or active"
         string account_login
         jsonb permissions_summary
-        string status
+        string status "pending|active|invalid|disconnected"
+        timestamptz created_at
         timestamptz connected_at
+        timestamptz disconnected_at
     }
     applications {
         uuid id PK
@@ -595,6 +597,7 @@ erDiagram
         string image_digest "sha256:..."
         string source "ci|manual"
         bigint workflow_run_id
+        string workflow_url "from the OIDC claims"
         uuid created_by FK
         text release_notes
         timestamptz created_at
@@ -703,9 +706,9 @@ Two infrastructure tables sit outside the diagram:
 ### 7.3 Integrity, indexing and conventions
 - Foreign keys on every relationship; never cascade-delete deployment, decision, event or audit history.
 - **CHECK constraints** on every status, decision, role, kind and `operation_type` value (mirrored in Python enums), and on `image_digest ~ '^sha256:[0-9a-f]{64}$'`.
-- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on active applications (partial index; archiving frees the repository), `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null).
+- **Unique constraints:** `workspaces.slug`, `(workspace_id, repository_id)` on active applications (partial index; archiving frees the repository), `(application_id, environment_type)` on environments, `(application_id, version)` on releases, `(deployment_id, reviewer_id)` on decisions, `webhook_deliveries.delivery_id`, `jobs.dedupe_key`, `(workspace_id, idempotency_key)` on deployments (where not null), and on integrations `installation_id` and `(workspace_id, provider)` while `pending` or `active` (partial indexes: an installation is linked to one workspace at a time, and a disconnected one can be linked again).
 - **Single active deployment per environment:** `CREATE UNIQUE INDEX deployments_one_active_per_env ON deployments (environment_id) WHERE status IN ('queued','deploying','verifying')`. A unique violation maps to **409**.
-- **Indexes:** `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
+- **Indexes:** `deployment_events (deployment_id, created_at)`, `jobs (locked_until) WHERE status = 'running'` (lease recovery), `deployments (environment_id, created_at DESC)`, `deployments (workspace_id, status, created_at DESC)` (also serves the approvals inbox), `deployments (release_id)`, `health_checks (environment_id, checked_at DESC)`, `jobs (run_after) WHERE status = 'pending'`, `environments (next_check_at)`, `audit_logs (workspace_id, target_type, target_id, created_at DESC)`.
 - **Append-only history:** a trigger rejects `UPDATE` and `DELETE` on `audit_logs` and `deployment_events`.
 - **Transactions** wrap "decision + transition + dispatch job" and every other state change with the jobs it implies.
 - **All timestamps are stored in UTC** (`timestamptz`) and rendered in the user's local timezone.
