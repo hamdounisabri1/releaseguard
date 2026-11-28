@@ -67,12 +67,21 @@ class JobContext:
 
 
 Handler = Callable[[JobContext], Awaitable[None]]
-# Runs in the transaction that marks the job dead, e.g. dispatch: queued → failed.
+# Runs in the transaction that marks the job dead (in a savepoint), e.g. dispatch: queued →
+# failed. It must not commit. If it raises, the job is still dead and the error is logged.
 DeadHook = Callable[[Session, ClaimedJob], None]
 
 
 @dataclass(frozen=True, slots=True)
 class JobSpec:
+    """A job kind's handler and failure hook.
+
+    Handlers must be idempotent and **tolerate overlap**: the lease timeout cancels the
+    coroutine, but work already handed to a thread keeps running while the retry may start.
+    Before a side effect (a dispatch), re-check the state under a row lock in a fresh
+    transaction.
+    """
+
     handler: Handler
     on_dead: DeadHook | None = None
 
@@ -209,8 +218,16 @@ class Worker:
             "job dead", job_id=str(job.id), job_kind=job.kind, attempt=job.attempt, error=error
         )
         spec = self.jobs.get(job.kind)
-        if spec is not None and spec.on_dead is not None:
-            spec.on_dead(db, job)
+        if spec is None or spec.on_dead is None:
+            return
+        # In a savepoint, so a failing hook rolls back only its own writes: the job still ends
+        # dead. Otherwise it would stay `running`, be re-claimed after its lease, fail again,
+        # and stall the loop (and the sweeps behind it) for good.
+        try:
+            with db.begin_nested():
+                spec.on_dead(db, job)
+        except Exception as exc:  # logged; the job stays dead for inspection
+            logger.error("job failure hook failed", job_id=str(job.id), error=error_name(exc))
 
     # --- sweeps -----------------------------------------------------------------------------
 

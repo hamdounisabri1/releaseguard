@@ -7,9 +7,11 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +20,7 @@ from app.models._columns import CreatedAt, UuidPk
 from app.models.enums import ReleaseSource
 
 DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
+CI_RUN_REGISTERED = "uq_releases_ci_workflow_run_id"
 
 
 class Release(Base):
@@ -35,6 +38,14 @@ class Release(Base):
         check_in("source", ReleaseSource),
         CheckConstraint(f"image_digest ~ '{DIGEST_PATTERN}'", name="image_digest"),
         CheckConstraint("commit_sha ~ '^[0-9a-f]{40}$'", name="commit_sha"),
+        # One release per CI run: a leaked OIDC token (valid for its run) can't register more.
+        Index(
+            CI_RUN_REGISTERED,
+            "application_id",
+            "workflow_run_id",
+            unique=True,
+            postgresql_where=text("source = 'ci'"),
+        ),
     )
 
     id: Mapped[UuidPk]

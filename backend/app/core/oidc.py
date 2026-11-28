@@ -58,8 +58,9 @@ class GitHubOidcClaims(BaseModel):
     workflow_ref: str = Field(min_length=1, max_length=500)
     sha: str = Field(pattern=r"^[0-9a-f]{40}$")
     run_id: int = Field(gt=0)
+    ref: str = Field(min_length=1, max_length=500)
     actor: str = Field(min_length=1, max_length=100)
-    event_name: str | None = None
+    event_name: str = Field(min_length=1, max_length=100)
 
 
 class OidcVerifier:

@@ -26,6 +26,10 @@ def enqueue(
 ) -> uuid.UUID | None:
     """Add a pending job (due now unless ``run_after``). Returns its id, or ``None`` when a job
     with the same ``dedupe_key`` exists already (enqueueing is idempotent).
+
+    A key stays taken while its job exists: done jobs for 7 days (retention), dead ones for
+    good. So a key names one piece of work (``dispatch:<deployment_id>``); work that may be
+    repeated needs a key per repetition.
     """
     return job_repository.add(
         db,

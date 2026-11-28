@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+import jwt
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -28,7 +29,7 @@ from tests.factories import (
     make_workspace,
     make_workspace_user,
 )
-from tests.oidc_keys import LocalKeys
+from tests.oidc_keys import KID, LocalKeys
 
 AUDIENCE = "releaseguard-test"
 CI = "/api/v1/releases/ci"
@@ -152,12 +153,28 @@ async def test_a_release_from_a_tag_is_accepted(ci_client: AsyncClient, db: Sess
     application = _app(db)
     repository = f"{application.repository_owner}/{application.repository_name}"
     claims = _claims(
-        application, workflow_ref=f"{repository}/.github/workflows/ci.yml@refs/tags/v1.4.0"
+        application,
+        workflow_ref=f"{repository}/.github/workflows/ci.yml@refs/tags/v1.4.0",
+        ref="refs/tags/v1.4.0",
     )
 
-    response = await _post_ci(ci_client, application, claims=claims)
+    response = await _post_ci(ci_client, application, claims=claims, branch=None)
 
     assert response.status_code == 201, response.text
+    assert response.json()["branch"] is None  # from the token's ref, not the body
+
+
+async def test_one_ci_run_registers_one_version(ci_client: AsyncClient, db: Session) -> None:
+    application = _app(db)
+    await _post_ci(ci_client, application)
+    before = _counts(db)
+
+    # The same run's token (valid for minutes) reused for another version and digest.
+    response = await _post_ci(ci_client, application, version="6.6.6", image_digest=digest("x"))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "release_version_exists"
+    assert _counts(db) == before
 
 
 async def test_a_ci_retry_of_the_same_build_returns_the_release(
@@ -204,6 +221,8 @@ TOKENS: dict[str, Callable[[Application], str]] = {
     "unknown_key_id": lambda a: KEYS.sign(_claims(a), kid="rotated-away"),
     "missing_repository_id": lambda a: KEYS.sign(_claims(a, repository_id=None)),
     "missing_exp": lambda a: KEYS.sign(_claims(a, exp=None)),
+    "missing_ref": lambda a: KEYS.sign(_claims(a, ref=None)),
+    "alg_none": lambda a: jwt.encode(_claims(a), "", algorithm="none", headers={"kid": KID}),
     "not_a_jwt": lambda a: "not.a.jwt",
 }
 
@@ -274,6 +293,10 @@ def _binding_cases(application: Application) -> dict[str, dict[str, Any]]:
         },
         "sha_mismatch": {"sha": "0" * 40},
         "run_id_mismatch": {"run_id": "1"},
+        # Runs the default branch's workflow file, but can build a fork's code.
+        "pull_request_target_event": {"event_name": "pull_request_target"},
+        "workflow_run_event": {"event_name": "workflow_run"},
+        "branch_mismatch": {"ref": "refs/heads/feature"},  # the body says main
     }
 
 
@@ -287,6 +310,9 @@ def _binding_cases(application: Application) -> dict[str, dict[str, Any]]:
         "workflow_of_another_repository",
         "sha_mismatch",
         "run_id_mismatch",
+        "pull_request_target_event",
+        "workflow_run_event",
+        "branch_mismatch",
     ],
 )
 async def test_a_token_bound_to_something_else_is_403_and_writes_nothing(

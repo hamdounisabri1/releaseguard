@@ -24,12 +24,14 @@ Registrar = Annotated[Principal, Depends(require_capability(Capability.REGISTER_
         401: {"model": ErrorResponse, "description": "Missing, invalid or expired OIDC token."},
         403: {
             "model": ErrorResponse,
-            "description": "The token's repository, workflow, ref, SHA or run doesn't match a "
-            "registered application (`oidc_binding_mismatch`).",
+            "description": "The token's repository, workflow, ref, event, branch, SHA or run "
+            "doesn't match a registered application (`oidc_binding_mismatch`).",
         },
         409: {
             "model": ErrorResponse,
-            "description": "The version exists with another build (`release_version_exists`).",
+            "description": "The version exists with another build, or the run registered "
+            "another version already (`release_version_exists`); the repository is bound in "
+            "more than one workspace (`repository_ambiguous`).",
         },
         503: {"model": ErrorResponse, "description": "GitHub's OIDC keys are unreachable."},
     },

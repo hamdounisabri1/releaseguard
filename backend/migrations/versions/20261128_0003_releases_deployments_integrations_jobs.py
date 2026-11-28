@@ -194,6 +194,13 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("id", "workspace_id", name=op.f("uq_releases_id_workspace_id")),
     )
+    op.create_index(
+        "uq_releases_ci_workflow_run_id",
+        "releases",
+        ["application_id", "workflow_run_id"],
+        unique=True,
+        postgresql_where=sa.text("source = 'ci'"),
+    )
     op.create_table(
         "deployments",
         sa.Column("id", sa.Uuid(), server_default=sa.text("gen_random_uuid()"), nullable=False),
@@ -394,6 +401,11 @@ def downgrade() -> None:
         postgresql_where=sa.text("status IN ('deploying', 'queued', 'verifying')"),
     )
     op.drop_table("deployments")
+    op.drop_index(
+        "uq_releases_ci_workflow_run_id",
+        table_name="releases",
+        postgresql_where=sa.text("source = 'ci'"),
+    )
     op.drop_table("releases")
     op.drop_index("uq_jobs_dedupe_key", table_name="jobs")
     op.drop_index(

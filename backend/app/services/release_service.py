@@ -19,6 +19,7 @@ from app.core.oidc import GitHubOidcClaims
 from app.core.permissions import Capability
 from app.models import Application, Release
 from app.models.enums import ApplicationStatus, ReleaseSource
+from app.models.releases import CI_RUN_REGISTERED
 from app.repositories import applications as application_repository
 from app.repositories import ci_identity
 from app.repositories import releases as release_repository
@@ -31,6 +32,10 @@ from app.services.authz import ensure_can, found
 logger = get_logger(__name__)
 
 _VERSION_TAKEN = "uq_releases_application_id_version"
+# Events whose runs may register releases. Not pull_request_target or workflow_run: they run the
+# default branch's workflow file (so workflow_ref looks trusted) but can build untrusted code.
+ALLOWED_EVENTS = frozenset({"push", "workflow_dispatch"})
+_HEADS = "refs/heads/"
 
 
 class OidcBindingError(ForbiddenError):
@@ -47,7 +52,10 @@ class RepositoryAmbiguousError(ConflictError):
 
 class ReleaseVersionConflictError(ConflictError):
     code = "release_version_exists"
-    message = "This version is already registered for the application with another build."
+    message = (
+        "This version is already registered for the application with another build, or this "
+        "CI run already registered another version."
+    )
 
 
 def _refuse(reason: str, claims: GitHubOidcClaims) -> OidcBindingError:
@@ -77,6 +85,10 @@ def _bound_application(db: Session, claims: GitHubOidcClaims, body: ReleaseCiCre
     ref = claims.workflow_ref.removeprefix(prefix)
     if ref != f"refs/heads/{application.default_branch}" and not ref.startswith("refs/tags/"):
         raise _refuse("ref_not_allowed", claims)
+    if claims.event_name not in ALLOWED_EVENTS:
+        raise _refuse("event_not_allowed", claims)
+    if body.branch is not None and body.branch != _branch(claims):
+        raise _refuse("branch_mismatch", claims)
     if body.commit_sha != claims.sha:
         raise _refuse("sha_mismatch", claims)
     if body.workflow_run_id != claims.run_id:
@@ -84,13 +96,20 @@ def _bound_application(db: Session, claims: GitHubOidcClaims, body: ReleaseCiCre
     return application
 
 
+def _branch(claims: GitHubOidcClaims) -> str | None:
+    """The branch the run was triggered on (``None`` for a tag), from the token, not the body."""
+    return claims.ref.removeprefix(_HEADS) if claims.ref.startswith(_HEADS) else None
+
+
 def _insert(db: Session, release: Release) -> Release | None:
-    """The new release, or ``None`` when its version is already registered for the app."""
+    """The new release, or ``None`` when its version (or, from CI, its run) is already
+    registered for the app.
+    """
     try:
         with db.begin_nested():
             return release_repository.add(db, release.workspace_id, release)
     except IntegrityError as exc:
-        if _VERSION_TAKEN in str(exc.orig):
+        if _VERSION_TAKEN in str(exc.orig) or CI_RUN_REGISTERED in str(exc.orig):
             return None
         raise
 
@@ -117,7 +136,8 @@ def register_ci_release(
         source=ReleaseSource.CI.value,
         workflow_url=f"https://github.com/{claims.repository}/actions/runs/{claims.run_id}",
         created_by=None,
-        **body.model_dump(),
+        **body.model_dump(exclude={"branch"}),
+        branch=_branch(claims),
     )
     created = _insert(db, release)
     if created is None:

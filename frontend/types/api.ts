@@ -1716,7 +1716,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The token's repository, workflow, ref, SHA or run doesn't match a registered application (`oidc_binding_mismatch`). */
+            /** @description The token's repository, workflow, ref, event, branch, SHA or run doesn't match a registered application (`oidc_binding_mismatch`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1725,7 +1725,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The version exists with another build (`release_version_exists`). */
+            /** @description The version exists with another build, or the run registered another version already (`release_version_exists`); the repository is bound in more than one workspace (`repository_ambiguous`). */
             409: {
                 headers: {
                     [name: string]: unknown;

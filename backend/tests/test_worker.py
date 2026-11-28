@@ -403,3 +403,45 @@ async def test_two_workers_never_run_the_same_job(
     with factory() as db:
         statuses = db.scalars(select(Job.status).where(Job.kind == kind)).all()
     assert set(statuses) == {JobStatus.DONE.value}
+
+
+# --- A failing failure hook (review finding on PR #26) ---------------------------------------
+
+
+class BrokenHook(Recorder):
+    def on_dead(self, db: Session, job: ClaimedJob) -> None:
+        super().on_dead(db, job)
+        db.add(Job(kind="written.by.the.hook"))  # rolled back with the hook's savepoint
+        db.flush()
+        raise RuntimeError("hook exploded")
+
+
+async def test_a_failing_dead_hook_still_buries_the_job_and_the_loop_moves_on(
+    db: Session,
+) -> None:
+    clock, recorder = Clock(), BrokenHook(failures=1)
+    doomed = _enqueue(db, clock, max_attempts=1)
+    next_clock = Clock()
+    next_clock.now = clock.now + timedelta(seconds=1)
+    later = _enqueue(db, next_clock)  # due after the doomed one, so it's claimed second
+    clock.advance(1)
+    worker = _worker(db, recorder, clock)
+
+    assert await worker.run_once() == 2  # the doomed job dies, then the next one runs
+
+    assert _job(db, doomed).status == JobStatus.DEAD.value
+    assert _job(db, later).status == JobStatus.DONE.value
+    assert [dead.id for dead in recorder.dead] == [doomed]
+    assert db.scalar(select(Job).where(Job.kind == "written.by.the.hook")) is None
+
+
+async def test_a_failing_dead_hook_on_lease_expiry_still_buries_the_job(db: Session) -> None:
+    clock, recorder = Clock(), BrokenHook()
+    doomed = _enqueue(db, clock, max_attempts=1)
+    _claim_and_crash(db, clock)
+    clock.advance(CONFIG.lease_seconds + 1)
+
+    assert await _worker(db, recorder, clock).run_once() == 0
+
+    job = _job(db, doomed)
+    assert (job.status, job.last_error) == (JobStatus.DEAD.value, LEASE_EXPIRED)
