@@ -799,7 +799,7 @@ Implement transitions as one table, `ALLOWED_TRANSITIONS: dict[Status, frozenset
 | | `POST /deployments/{id}/decisions` | Approve or reject with comment | Reviewer |
 | Rollbacks | `GET /environments/{id}/rollback-candidates` · `POST /rollbacks` | Eligible releases; start a rollback (target release, reason) | Developer |
 | Health | `GET /environments/{id}/health` · `GET /environments/{id}/health-checks` · `POST /environments/{id}/health/check-now` | Current status, history, enqueue an immediate check | Viewer / Admin |
-| GitHub | `POST /github/webhooks` (HMAC-verified, no session) · `GET /integrations` · `POST /integrations/github/callback` · `DELETE /integrations/{id}` | Webhook intake; App install and uninstall | system / Admin |
+| GitHub | `POST /github/webhooks` (HMAC-verified, no session) · `GET /integrations` · `POST /integrations/github/callback` (202 `pending`, verified by the worker; 200 if already linked here) · `DELETE /integrations/{id}` (204, idempotent) | Webhook intake; App install and uninstall | system / Admin |
 | AI | `POST /deployments/{id}/ai-analysis` · `GET /deployments/{id}/ai-analysis` · `POST /releases/{id}/release-notes` | Enqueue or view AI analysis and release notes | Viewer / Developer |
 | Audit | `GET /audit-logs?target_type=&target_id=&actor=` | Audit trail | Viewer |
 | Ops | `GET /healthz` · `GET /readyz` | Liveness and readiness of ReleaseGuard itself | public |
@@ -985,7 +985,8 @@ ReleaseGuard has authority over production release decisions, so security is par
 - Validate webhook signatures with **HMAC-SHA256** (`X-Hub-Signature-256`) and a **constant-time comparison**, before parsing the body.
 - Reject duplicate deliveries using `X-GitHub-Delivery` IDs.
 - Authenticate CI release registration with **GitHub OIDC** and bind the token's `repository_id`, `workflow_ref` and `sha` to the application. No shared secret.
-- Rotate and revoke credentials when an integration is disconnected.
+- **The install callback is untrusted** (its `installation_id` comes from a browser redirect): `POST /integrations/github/callback` (Admin) only records a `pending` link and enqueues `github.verify_installation`; the worker asks GitHub (`GET /app/installations/{id}` with the App JWT) and marks it `active` or `invalid`. Only `active` installations are used. An installation linked (pending or active) to one workspace is refused for any other (409 `installation_unavailable`, without naming the holder). Known gap: an Admin could link an installation of our App that nobody has linked yet but that belongs to another GitHub account; closing it needs a user-to-server OAuth check during install (backlog).
+- Rotate and revoke credentials when an integration is disconnected: disconnecting makes the installation unusable at once (dispatch reads only `active` integrations), and cached installation tokens are dropped with it (SCRUM-44).
 
 ### 13.3 Deployment safety
 - No arbitrary deployment commands from users or from AI output.

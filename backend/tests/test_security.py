@@ -23,10 +23,16 @@ from app.api.deps import get_db
 from app.core.config import Settings
 from app.core.permissions import Role
 from app.main import create_app
-from app.models import Application, AuditLog, Environment, Workspace
-from app.models.enums import EnvironmentType
+from app.models import Application, AuditLog, Environment, Integration, Job, Workspace
+from app.models.enums import EnvironmentType, IntegrationStatus
 from tests.conftest import SITE_ORIGIN, client_for, sign_in
-from tests.factories import make_application, make_environment, make_workspace, make_workspace_user
+from tests.factories import (
+    make_application,
+    make_environment,
+    make_integration,
+    make_workspace,
+    make_workspace_user,
+)
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 FOREIGN_ORIGIN = {"Origin": "https://evil.example"}
@@ -50,6 +56,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/applications/{application_id}"): {"name": "Tampered"},
     ("POST", "/api/v1/applications/{application_id}/archive"): None,
     ("PATCH", "/api/v1/environments/{environment_id}"): {"failure_threshold": 7},
+    ("POST", "/api/v1/integrations/github/callback"): {"installation_id": 424242},
+    ("DELETE", "/api/v1/integrations/{integration_id}"): None,
 }
 
 
@@ -94,17 +102,24 @@ def _ids(db: Session, workspace: Workspace) -> dict[str, uuid.UUID]:
     """One real resource per path parameter, in ``workspace``."""
     application = make_application(db, workspace)
     environment = make_environment(db, application, EnvironmentType.PRODUCTION)
-    return {"application_id": application.id, "environment_id": environment.id}
+    integration = make_integration(db, workspace, status=IntegrationStatus.ACTIVE)
+    return {
+        "application_id": application.id,
+        "environment_id": environment.id,
+        "integration_id": integration.id,
+    }
 
 
-def _snapshot(db: Session) -> tuple[int, int]:
-    """Row counts a refused request must not change: audit entries and applications."""
-    audits = db.scalar(select(func.count()).select_from(AuditLog)) or 0
-    applications = db.scalar(select(func.count()).select_from(Application)) or 0
-    return audits, applications
+# Tables a refused request must not add rows to.
+_COUNTED = (AuditLog, Application, Integration, Job)
 
 
-def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int, int]) -> None:
+def _snapshot(db: Session) -> tuple[int, ...]:
+    """Row counts a refused request must not change."""
+    return tuple(db.scalar(select(func.count()).select_from(t)) or 0 for t in _COUNTED)
+
+
+def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int, ...]) -> None:
     """Nothing was written: same counts, and the test resources still hold their values.
 
     Re-read from the database (``expire_all``), not from the session's identity map.
@@ -116,6 +131,8 @@ def _assert_untouched(db: Session, ids: dict[str, uuid.UUID], before: tuple[int,
     assert application is not None and environment is not None
     assert application.name == "TaskFlow" and application.archived_at is None
     assert environment.failure_threshold != 7  # the value BODIES tries to set
+    integration = db.get(Integration, ids["integration_id"])
+    assert integration is not None and integration.status == IntegrationStatus.ACTIVE.value
 
 
 async def _send(

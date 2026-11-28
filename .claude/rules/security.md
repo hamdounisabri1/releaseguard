@@ -21,6 +21,7 @@ ReleaseGuard has authority over production releases. These rules apply to all co
 - De-duplicate by `X-GitHub-Delivery` (`webhook_deliveries.delivery_id` unique). A duplicate returns 200 and does nothing.
 - Use short-lived installation tokens, cached and refreshed before they expire. Never use personal access tokens in app code.
 - Request only the GitHub App permissions the workflows need: Actions RW, Contents R, Metadata R. Subscribe to `workflow_run` only.
+- **The install callback's `installation_id` is untrusted** (browser redirect). Store it `pending` and let the worker confirm it with GitHub (`app/worker/handlers/github_installation.py`); only `active` integrations (`integrations.get_active_github`) may be used for GitHub calls. An installation linked to one workspace is refused for every other one by the partial unique index, with a 409 that doesn't name the holder.
 - **CI release registration** uses GitHub Actions OIDC, not a shared secret. Verify the JWT signature against GitHub's JWKS plus `iss`, `aud` (`GITHUB_OIDC_AUDIENCE`) and `exp`, then require `repository_id` = the application's repository id, `workflow_ref` = its CI workflow on the default branch or a tag, and `sha` = the body's commit SHA. Any mismatch → 401/403 and nothing is written (ADR-0006).
 
 ## Deployment safety
