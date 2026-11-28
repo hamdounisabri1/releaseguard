@@ -5,7 +5,7 @@ Next.js · FastAPI · PostgreSQL · Docker · GitHub Actions · AI-assisted fail
 
 ReleaseGuard is not a CI/CD engine. GitHub Actions builds and deploys. ReleaseGuard decides whether a release may proceed, records every approval, triggers the approved workflows, verifies health and coordinates rollback to a known-good image digest.
 
-> 🚧 **Status: pre-code.** The design, plan and tooling are in place. The monorepo layout exists as placeholders; application code starts in Sprint 1. Target MVP `v1.0.0`: 2 Dec 2026 (compressed from 19 Feb 2027 on 25 Nov).
+> 🚧 **Status: Sprint 2 in progress.** Sprint 1 is done: sign-in with login throttling, roles and workspace isolation, applications and their three environments, and CI. Sprint 2 (releases and tracking) is under way. Target MVP `v1.0.0`: 2 Dec 2026 (compressed from 19 Feb 2027 on 25 Nov).
 
 ## How it works
 
@@ -20,8 +20,8 @@ ReleaseGuard is not a CI/CD engine. GitHub Actions builds and deploys. ReleaseGu
 | Sprint | Dates | Goal | Release |
 |---|---|---|---|
 | 0 Setup | 22–24 Nov 2026 | Repos, GitHub App, tooling, ADRs | none |
-| 1 Foundation | 26 – 27 Nov | Auth, RBAC, applications and environments, CI | `v0.1.0` |
-| 2 Releases and tracking | 28 Nov | GitHub integration, OIDC releases, worker, webhooks, dev and staging deployments | `v0.2.0` |
+| 1 Foundation ✅ | 26 – 27 Nov | Auth, RBAC, applications and environments, CI | `v0.1.0` |
+| 2 Releases and tracking (in progress) | 28 Nov | GitHub integration, OIDC releases, worker, webhooks, dev and staging deployments | `v0.2.0` |
 | 3 Approval engine | 29 Nov | Approval gate, production dispatch, concurrency | `v0.3.0` |
 | 4 Health and rollback | 30 Nov | Verification, health checks, rollback | `v0.4.0` |
 | 5 AI assistant | 1 Dec | Sanitized failure analysis | `v0.5.0` |
@@ -50,7 +50,7 @@ frontend/       Next.js web UI (App Router, shadcn/ui)
 worker/         Worker entrypoint and container (Sprint 2)
 infra/          Docker Compose, Caddy reverse proxy, backup/restore scripts
 .claude/        Claude Code config: rules, skills, hooks, agents, commands
-.github/        PR template (workflows arrive in Sprint 1)
+.github/        PR template, CI workflow (ci.yml, SCRUM-33); release and nightly workflows come later
 docs/           Lifecycle guide, project plan, architecture review, ADRs, AI tooling, spec
 CLAUDE.md       Instructions for Claude Code
 .env.example    Environment variables (filled in as they are introduced)
