@@ -27,6 +27,9 @@ out/
 *.tsbuildinfo
 .pnpm-store/
 
+# graphify code graph (regenerated with `graphify update .`; never committed)
+graphify-out/
+
 # Playwright
 test-results/
 playwright-report/

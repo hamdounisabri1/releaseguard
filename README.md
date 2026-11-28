@@ -69,7 +69,7 @@ This project uses [Claude Code](https://claude.com/claude-code) with project-sco
 
 - **Plugins:** `github`, `context7`, `security-guidance`, `commit-commands`, `claude-md-management`
 - **MCP servers:** `jira` (`mcp-atlassian`, Jira project `SCRUM`)
-- **Skills:** `ui-ux-pro-max`, `webapp-testing`, `postgresql-table-design`, `postgresql-optimization`, `fastapi-templates`, `typescript-advanced-types`, `github-actions-hardening`, `multi-stage-dockerfile`, `jira-integration`, `to-tickets`, `system-design`, `architecture`, `project-progress` (own: full project status report)
+- **Skills:** `ui-ux-pro-max`, `webapp-testing`, `postgresql-table-design`, `postgresql-optimization`, `fastapi-templates`, `typescript-advanced-types`, `github-actions-hardening`, `multi-stage-dockerfile`, `jira-integration`, `to-tickets`, `system-design`, `architecture`, `project-progress` (own: full project status report), `graphify` (code knowledge graph, deferred to Sprint 4)
 - **Hooks:** secret-file guard + gitleaks on commit, auto-format/lint after edits
 - **Agents and commands:** `release-safety-reviewer`, `/sprint-status`, `/new-adr`, `/lesson`, `/dod-check`, `/bulk`
 - **Scripts:** `.claude/scripts/jira.py` (bulk Jira reads and transitions, many tickets per call)
